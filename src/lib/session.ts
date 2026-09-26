@@ -53,6 +53,9 @@ export async function handle(fn: () => Promise<Response>): Promise<Response> {
     if (err instanceof HttpError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
+    if (err instanceof SyntaxError) {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
     if (err && typeof err === "object" && "issues" in err) {
       // zod validation error
       const issues = (err as { issues: { path: PropertyKey[]; message: string }[] }).issues;

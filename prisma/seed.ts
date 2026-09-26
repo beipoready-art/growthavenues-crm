@@ -380,6 +380,13 @@ async function main() {
     ],
   });
 
+  // ─── Company profile (sample values — edit under Settings) ───────────────
+  await prisma.companyProfile.upsert({
+    where: { id: 1 },
+    create: { id: 1, firmName: "GrowthAvenues", tagline: "Stock Broking & IPO Advisory", phone: "+91 22 4000 5000", email: "support@growthavenues.in", website: "https://growthavenues.in", sebiRegistration: "INZ000000000 (sample)", address: "Mumbai, Maharashtra" },
+    update: { firmName: "GrowthAvenues", tagline: "Stock Broking & IPO Advisory", phone: "+91 22 4000 5000", email: "support@growthavenues.in", website: "https://growthavenues.in", sebiRegistration: "INZ000000000 (sample)", address: "Mumbai, Maharashtra", logoKey: null, logoMime: null },
+  });
+
   console.log(`Seeded. All users share the password: ${PASSWORD}`);
   console.table([
     { role: "Admin", email: admin.email },

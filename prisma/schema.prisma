@@ -419,3 +419,21 @@ model Notification {
   @@unique([userId, dedupeKey])
   @@index([userId, readAt, createdAt])
 }
+
+// ─── Settings (Phase 3) ───────────────────────────────────────────────────
+
+// Singleton row (id = 1): firm profile shown across the CRM.
+model CompanyProfile {
+  id               Int      @id @default(1)
+  firmName         String   @default("GrowthAvenues")
+  tagline          String?
+  email            String?
+  phone            String?
+  website          String?
+  address          String?
+  sebiRegistration String?
+  logoKey          String? // storage key of the uploaded logo
+  logoMime         String?
+  updatedAt        DateTime @updatedAt
+  updatedById      String?
+}

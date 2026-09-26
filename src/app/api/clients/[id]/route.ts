@@ -42,6 +42,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
       if (Object.keys(changes).length) {
         await audit(tx, { entityType: "Client", entityId: client.id, action: "updated", userId: user.id, metadata: changes as object });
       }
+      // Keep the originating lead with the client so its history stays accessible.
+      if (changes.assignedRmId && u.leadId) await tx.lead.update({ where: { id: u.leadId }, data: { assignedRmId: u.assignedRmId } });
       if (changes.assignedRmId && u.assignedRmId) {
         await notify(tx, [u.assignedRmId], { type: "CLIENT_ASSIGNED", title: `Client assigned to you: ${u.name}`, body: `Reassigned by ${user.name}`, link: `/clients/${u.id}` }, user.id);
       }

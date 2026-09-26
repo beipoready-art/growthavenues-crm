@@ -6,7 +6,15 @@ import { UsersTable } from "./users-table";
 
 export default async function UsersPage() {
   const me = await requirePageUser("users:manage");
-  const users = await prisma.user.findMany({ select: userSelect, orderBy: [{ active: "asc" }, { name: "asc" }] });
+  const [users, leadBooks, clientBooks] = await Promise.all([
+    prisma.user.findMany({ select: userSelect, orderBy: [{ active: "asc" }, { name: "asc" }] }),
+    prisma.lead.groupBy({ by: ["assignedRmId"], where: { status: { not: "CONVERTED" }, assignedRmId: { not: null } }, _count: { _all: true } }),
+    prisma.client.groupBy({ by: ["assignedRmId"], where: { assignedRmId: { not: null } }, _count: { _all: true } }),
+  ]);
+  const book = (id: string) => ({
+    leads: leadBooks.find((b) => b.assignedRmId === id)?._count._all ?? 0,
+    clients: clientBooks.find((b) => b.assignedRmId === id)?._count._all ?? 0,
+  });
   const pending = users.filter((u) => !u.active).length;
 
   return (
@@ -16,7 +24,10 @@ export default async function UsersPage() {
         description={`${users.length} users${pending ? ` · ${pending} awaiting activation` : ""}`}
       />
       <PageBody>
-        <UsersTable users={users.map((u) => ({ ...u, lastLoginAt: u.lastLoginAt?.toISOString() ?? null, createdAt: u.createdAt.toISOString() }))} currentUserId={me.id} />
+        <UsersTable
+          users={users.map((u) => ({ ...u, lastLoginAt: u.lastLoginAt?.toISOString() ?? null, createdAt: u.createdAt.toISOString(), book: u.role === "RM" ? book(u.id) : null }))}
+          currentUserId={me.id}
+        />
       </PageBody>
     </>
   );

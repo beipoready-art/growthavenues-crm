@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Card, EmptyState, Table, Td, Th } from "@/components/layout";
 import { Badge, Button, ErrorText, Field, Input, Modal, Select } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { options, ROLE_LABELS, ROLE_TONE } from "@/lib/labels";
+import { options, ROLE_LABELS, ROLE_SHORT_LABELS, ROLE_TONE } from "@/lib/labels";
 
 type UserRow = {
   id: string;
@@ -17,6 +17,7 @@ type UserRow = {
   active: boolean;
   lastLoginAt: string | null;
   createdAt: string;
+  book: { leads: number; clients: number } | null;
 };
 
 const roleOptions = options(ROLE_LABELS);
@@ -32,8 +33,14 @@ export function UsersTable({ users, currentUserId }: { users: UserRow[]; current
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
+  const [reassigning, setReassigning] = useState<UserRow | null>(null);
+  const activeRms = users.filter((u) => u.role === "RM" && u.active);
 
   async function toggleActive(u: UserRow) {
+    if (u.active && u.book && u.book.leads + u.book.clients > 0) {
+      const ok = confirm(`${u.name} still has ${u.book.leads} open leads and ${u.book.clients} clients. Deactivate anyway? (Use "Reassign book" to hand them over first.)`);
+      if (!ok) return;
+    }
     try {
       await send(`/api/users/${u.id}`, "PATCH", { active: !u.active });
       router.refresh();
@@ -61,28 +68,36 @@ export function UsersTable({ users, currentUserId }: { users: UserRow[]; current
                 <Th>Name</Th>
                 <Th>Role</Th>
                 <Th>Status</Th>
+                <Th>Book</Th>
                 <Th>Last login</Th>
-                <Th>Created</Th>
                 <Th className="text-right">Actions</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {users.map((u) => (
                 <tr key={u.id} className="hover:bg-gray-50/60">
-                  <Td>
+                  <Td className="max-w-[14rem] truncate">
                     <div className="font-medium text-gray-900">
                       {u.name} {u.id === currentUserId && <span className="text-xs font-normal text-gray-400">(you)</span>}
                     </div>
                     <div className="text-xs text-gray-500">{u.email}</div>
                   </Td>
                   <Td>
-                    <Badge tone={ROLE_TONE[u.role]}>{ROLE_LABELS[u.role]}</Badge>
+                    <Badge tone={ROLE_TONE[u.role]}>{ROLE_SHORT_LABELS[u.role]}</Badge>
                   </Td>
                   <Td>{u.active ? <Badge tone="green">Active</Badge> : <Badge tone="amber">Inactive</Badge>}</Td>
-                  <Td>{formatDateTime(u.lastLoginAt)}</Td>
-                  <Td>{formatDate(u.createdAt)}</Td>
+                  <Td className="text-xs text-gray-600">{u.book ? `${u.book.leads} leads · ${u.book.clients} clients` : "—"}</Td>
+                  <Td>
+                    {formatDateTime(u.lastLoginAt)}
+                    <div className="text-xs text-gray-400">Joined {formatDate(u.createdAt)}</div>
+                  </Td>
                   <Td className="text-right">
                     <div className="flex justify-end gap-1">
+                      {u.book && u.book.leads + u.book.clients > 0 && (
+                        <Button size="sm" variant="ghost" onClick={() => setReassigning(u)}>
+                          Reassign book
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => setEditing(u)}>
                         Edit
                       </Button>
@@ -100,6 +115,9 @@ export function UsersTable({ users, currentUserId }: { users: UserRow[]; current
         )}
       </Card>
 
+      {reassigning && (
+        <ReassignModal from={reassigning} targets={activeRms.filter((r) => r.id !== reassigning.id)} onClose={() => setReassigning(null)} onDone={() => router.refresh()} />
+      )}
       <CreateUserModal open={creating} onClose={() => setCreating(false)} onDone={() => router.refresh()} />
       {editing && (
         <EditUserModal
@@ -221,6 +239,81 @@ function EditUserModal({ user, isSelf, onClose, onDone }: { user: UserRow; isSel
           <Input id="eu-password" name="password" type="text" minLength={8} />
         </Field>
       </form>
+    </Modal>
+  );
+}
+
+function ReassignModal({ from, targets, onClose, onDone }: { from: UserRow; targets: UserRow[]; onClose: () => void; onDone: () => void }) {
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    const f = new FormData(e.currentTarget);
+    try {
+      const r = await send("/api/admin/reassign", "POST", {
+        fromRmId: from.id,
+        toRmId: f.get("toRmId"),
+        leads: f.get("leads") === "on",
+        clients: f.get("clients") === "on",
+        tasks: f.get("tasks") === "on",
+      });
+      setResult(`Moved ${r.leads} leads, ${r.clients} clients and ${r.tasks} open tasks.`);
+      onDone();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Reassign ${from.name}'s book`}
+      description="Hands leads and clients to another RM. Interaction history stays with each record; every move is logged."
+      footer={
+        result ? (
+          <Button onClick={onClose}>Done</Button>
+        ) : (
+          <>
+            <Button variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" form="reassign-form" loading={loading} disabled={targets.length === 0}>
+              Reassign
+            </Button>
+          </>
+        )
+      }
+    >
+      {result ? (
+        <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800" data-testid="reassign-result">
+          {result}
+        </p>
+      ) : (
+        <form id="reassign-form" onSubmit={onSubmit} className="space-y-3">
+          <ErrorText>{error}</ErrorText>
+          <Field label="Reassign to" htmlFor="ra-to">
+            <Select id="ra-to" name="toRmId" options={targets.map((t) => ({ value: t.id, label: t.name }))} required />
+          </Field>
+          <fieldset className="space-y-2 text-sm text-gray-700">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="leads" defaultChecked className="rounded border-gray-300" /> Open leads ({from.book?.leads ?? 0})
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="clients" defaultChecked className="rounded border-gray-300" /> Clients ({from.book?.clients ?? 0}), with their originating leads
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="tasks" defaultChecked className="rounded border-gray-300" /> Open follow-up tasks on those records
+            </label>
+          </fieldset>
+        </form>
+      )}
     </Modal>
   );
 }

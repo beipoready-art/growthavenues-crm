@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { BarChart3, Briefcase, CheckSquare, LayoutDashboard, Rocket, TrendingUp, LogOut, ShieldCheck, Target, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, Briefcase, CheckSquare, LayoutDashboard, Settings, Rocket, TrendingUp, LogOut, ShieldCheck, Target, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -30,17 +30,31 @@ const NAV: { section?: string; items: NavItem[] }[] = [
       { href: "/reports", label: "Reports", icon: BarChart3, permission: "reports:view" },
     ],
   },
-  { section: "Admin", items: [{ href: "/users", label: "Users", icon: Users, permission: "users:manage" }] },
+  {
+    section: "Admin",
+    items: [
+      { href: "/users", label: "Users & RM books", icon: Users, permission: "users:manage" },
+      { href: "/settings", label: "Settings", icon: Settings, permission: "settings:manage" },
+    ],
+  },
 ];
 
-export function Sidebar({ user, badges = {} }: { user: { name: string; email: string; role: Role }; badges?: Record<string, number> }) {
+export function Sidebar({
+  user,
+  badges = {},
+  company,
+}: {
+  user: { name: string; email: string; role: Role };
+  badges?: Record<string, number>;
+  company: { firmName: string; logoUrl: string | null };
+}) {
   const pathname = usePathname();
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/"));
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-60 flex-col border-r border-gray-200 bg-white">
-      <div className="flex h-14 items-center border-b border-gray-100 px-4">
-        <Logo />
+      <div className="flex h-12 items-center border-b border-gray-200 px-4">
+        <Logo firmName={company.firmName} logoUrl={company.logoUrl} />
       </div>
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
         {NAV.map((group, i) => {

@@ -7,6 +7,13 @@ export const ROLE_LABELS: Record<Role, string> = {
   VIEWER: "Viewer",
 };
 
+export const ROLE_SHORT_LABELS: Record<Role, string> = {
+  ADMIN: "Admin",
+  COMPLIANCE: "Compliance",
+  RM: "RM",
+  VIEWER: "Viewer",
+};
+
 export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
   REFERRAL: "Referral",
   WEBSITE: "Website",

@@ -26,7 +26,10 @@ test("generated reminders: task due/overdue and IPO closing soon, without duplic
 test("KYC changes notify compliance on submit and the RM on review, never the actor", async ({ browser }) => {
   const rm = await as(browser, "rm2");
   const co = await as(browser, "compliance");
-  const nimbus = (await (await co.request.get("/api/clients?q=Nimbus")).json()).clients[0]; // Under Review
+  const nimbus = (await (await co.request.get("/api/clients?q=Nimbus")).json()).clients[0]; // Under Review in the seed
+  // Earlier specs may have moved it along; bring it to Under Review first.
+  if (nimbus.kycStatus === "REJECTED") await rm.request.post(`/api/clients/${nimbus.id}/kyc`, { data: { toStatus: "SUBMITTED" } });
+  if (nimbus.kycStatus !== "UNDER_REVIEW") await co.request.post(`/api/clients/${nimbus.id}/kyc`, { data: { toStatus: "UNDER_REVIEW" } });
   expect((await co.request.post(`/api/clients/${nimbus.id}/kyc`, { data: { toStatus: "REJECTED", note: "Board resolution missing" } })).status()).toBe(200);
   const rmNotes = (await list(rm)).notifications;
   expect(rmNotes[0].title).toBe("KYC rejected: Nimbus Tech Pvt Ltd");

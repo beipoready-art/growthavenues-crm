@@ -12,9 +12,13 @@ import { formatDateTime } from "@/lib/format";
 type Item = Omit<Notification, "createdAt" | "readAt"> & { createdAt: string; readAt: string | null };
 
 /** Bell with unread badge and a dropdown of the latest notifications. */
-export function NotificationBell({ unread }: { unread: number }) {
+export function NotificationBell({ unread: serverUnread }: { unread: number }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  // The layout (and so the server count) is kept across client navigations,
+  // so track the count locally and resync whenever the server sends a new one.
+  const [unread, setUnread] = useState(serverUnread);
+  useEffect(() => setUnread(serverUnread), [serverUnread]);
   const [items, setItems] = useState<Item[] | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -27,14 +31,19 @@ export function NotificationBell({ unread }: { unread: number }) {
   }, [open]);
 
   async function openItem(n: Item) {
-    if (!n.readAt) await api(`/api/notifications/${n.id}`, "PATCH", { read: true });
+    if (!n.readAt) {
+      await api(`/api/notifications/${n.id}`, "PATCH", { read: true });
+      setUnread((c) => Math.max(0, c - 1));
+    }
     setOpen(false);
+    // push() fetches the destination fresh; a refresh() right after can cancel the navigation.
     if (n.link) router.push(n.link);
-    router.refresh();
+    else router.refresh();
   }
 
   async function readAll() {
     await api("/api/notifications/read-all", "POST");
+    setUnread(0);
     setItems((xs) => xs?.map((x) => ({ ...x, readAt: x.readAt ?? new Date().toISOString() })) ?? null);
     router.refresh();
   }

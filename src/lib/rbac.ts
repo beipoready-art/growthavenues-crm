@@ -9,6 +9,7 @@ import type { Role } from "@prisma/client";
  */
 export const PERMISSIONS = {
   "users:manage": ["ADMIN"],
+  "settings:manage": ["ADMIN"],
 
   "leads:view": ["ADMIN", "COMPLIANCE", "RM", "VIEWER"],
   "leads:create": ["ADMIN", "RM"],
@@ -74,4 +75,6 @@ export function ownsRecord(user: { id: string; role: Role }, record: { assignedR
 export const ROUTE_RULES: { prefix: string; permission: Permission }[] = [
   { prefix: "/users", permission: "users:manage" },
   { prefix: "/api/users", permission: "users:manage" },
+  { prefix: "/settings", permission: "settings:manage" },
+  { prefix: "/api/admin", permission: "users:manage" },
 ];

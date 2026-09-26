@@ -55,6 +55,8 @@ export async function History({ entities, title = "History" }: { entities: { typ
     const m = l.metadata as Record<string, Change> | null;
     const c = m?.assignedRmId;
     if (c) [c.from, c.to].forEach((v) => typeof v === "string" && ids.add(v));
+    const to = (l.metadata as Record<string, unknown> | null)?.to;
+    if (typeof to === "string") ids.add(to);
   }
   const users = ids.size ? await prisma.user.findMany({ where: { id: { in: [...ids] } }, select: { id: true, name: true } }) : [];
   const names = Object.fromEntries(users.map((u) => [u.id, u.name]));
@@ -88,6 +90,8 @@ export async function History({ entities, title = "History" }: { entities: { typ
       }
       case "ipo_interest":
         return `marked the client as interested in ${m.ipo}`;
+      case "book_reassigned":
+        return `reassigned this RM's book (${m.leads} leads, ${m.clients} clients, ${m.tasks} tasks) to ${names[m.to as string] ?? "another RM"}`;
       case "document_uploaded":
         return `uploaded ${m.category ? (DOCUMENT_CATEGORY_LABELS[m.category as keyof typeof DOCUMENT_CATEGORY_LABELS] ?? "a document") : "a document"} (${m.fileName ?? "file"}${Number(m.version) > 1 ? `, version ${m.version}` : ""})`;
       case "deleted":
