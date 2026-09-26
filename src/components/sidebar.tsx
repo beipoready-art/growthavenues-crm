@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Briefcase, LayoutDashboard, Rocket, TrendingUp, LogOut, ShieldCheck, Target, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, Briefcase, LayoutDashboard, Rocket, TrendingUp, LogOut, ShieldCheck, Target, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -26,6 +26,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
     section: "Insights",
     items: [
       { href: "/performance", label: "Performance", icon: TrendingUp, permission: "performance:view" },
+      { href: "/reports", label: "Reports", icon: BarChart3, permission: "reports:view" },
     ],
   },
   { section: "Admin", items: [{ href: "/users", label: "Users", icon: Users, permission: "users:manage" }] },

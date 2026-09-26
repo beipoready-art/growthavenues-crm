@@ -39,6 +39,8 @@ export const PERMISSIONS = {
   "performance:viewOwn": ["RM"],
   "performance:leaderboard": ["ADMIN"],
 
+  "reports:view": ["ADMIN", "COMPLIANCE", "RM", "VIEWER"], // data is RM-scoped
+
   "dashboard:org": ["ADMIN", "COMPLIANCE", "VIEWER"],
 } as const satisfies Record<string, readonly Role[]>;
 

@@ -235,6 +235,73 @@ async function main() {
     { fileName: "cn-sep-2026-corrected.pdf", age: 5, by: admin.id },
   ]);
 
+  // ─── History: older leads, conversions and past IPOs (for reports) ─────
+  const history: [string, LeadSource, number, "CONVERTED" | "LOST" | "CONTACTED", "rm1" | "rm2"][] = [
+    ["Harish Chandra", "REFERRAL", 160, "CONVERTED", "rm1"],
+    ["Lakshmi Iyer", "WEBSITE", 150, "LOST", "rm2"],
+    ["Gaurav Malhotra", "CALL_IN", 140, "CONTACTED", "rm1"],
+    ["Pooja Deshmukh", "REFERRAL", 125, "CONVERTED", "rm2"],
+    ["Imran Sheikh", "WEBSITE", 118, "LOST", "rm1"],
+    ["Ritu Bansal", "WEBSITE", 100, "CONVERTED", "rm1"],
+    ["Sanjay Rathi", "OTHER", 92, "LOST", "rm2"],
+    ["Anjali Pillai", "REFERRAL", 85, "CONVERTED", "rm2"],
+    ["Deepak Sinha", "CALL_IN", 70, "CONVERTED", "rm1"],
+    ["Mohan Krishnan", "WEBSITE", 64, "LOST", "rm2"],
+    ["Tanvi Shah", "REFERRAL", 55, "CONVERTED", "rm1"],
+    ["Yusuf Ali", "CALL_IN", 45, "CONTACTED", "rm2"],
+  ];
+  const rmOf = { rm1, rm2 };
+  const historicalClients: string[] = [];
+  for (const [i, [name, source, age, status, who]] of history.entries()) {
+    const rmId = rmOf[who].id;
+    const digits = `98${String(20000000 + i * 137911)}`;
+    const phone = `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
+    const convertedAt = status === "CONVERTED" ? daysAgo(age - 9) : null;
+    const lead = await prisma.lead.create({
+      data: { name, phone, source, status, assignedRmId: rmId, createdById: admin.id, createdAt: daysAgo(age), convertedAt },
+    });
+    if (convertedAt) {
+      const client = await prisma.client.create({
+        data: {
+          name, phone, source, clientType: "INDIVIDUAL", kycStatus: "VERIFIED", assignedRmId: rmId, leadId: lead.id, createdAt: convertedAt,
+          panNumber: `H${"ABCDEFGHIJKL"[i]}${"PQRST"[i % 5]}P${"MN"[i % 2]}${String(4000 + i * 37).slice(0, 4)}${"XYZ"[i % 3]}`,
+        },
+      });
+      historicalClients.push(client.id);
+      await prisma.kycStatusChange.createMany({
+        data: [
+          { clientId: client.id, fromStatus: null, toStatus: "PENDING", changedById: rmId, createdAt: convertedAt },
+          { clientId: client.id, fromStatus: "PENDING", toStatus: "SUBMITTED", changedById: rmId, createdAt: daysAgo(age - 10) },
+          { clientId: client.id, fromStatus: "SUBMITTED", toStatus: "UNDER_REVIEW", changedById: compliance.id, createdAt: daysAgo(age - 11) },
+          { clientId: client.id, fromStatus: "UNDER_REVIEW", toStatus: "VERIFIED", changedById: compliance.id, createdAt: daysAgo(age - 12) },
+        ],
+      });
+    }
+  }
+  const pastIpos = [
+    { companyName: "Godavari Logistics Ltd", symbol: "GODAVARI", priceBandLow: 198, priceBandHigh: 210, lotSize: 70, open: -110, status: "ALLOTTED" as const },
+    { companyName: "Malabar Textiles Ltd", symbol: "MALABAR", priceBandLow: 88, priceBandHigh: 92, lotSize: 160, open: -68, status: "REFUNDED" as const },
+  ];
+  for (const [k, p] of pastIpos.entries()) {
+    const ipo = await prisma.ipo.create({
+      data: {
+        companyName: p.companyName, symbol: p.symbol, exchange: "NSE, BSE", priceBandLow: p.priceBandLow, priceBandHigh: p.priceBandHigh, lotSize: p.lotSize,
+        openDate: day(p.open), closeDate: day(p.open + 3), listingDate: day(p.open + 8), status: "LISTED", createdById: admin.id,
+      },
+    });
+    const applicants = [suresh.id, arjun.id, ...historicalClients.slice(0, 2 + k * 2)];
+    for (const [j, clientId] of applicants.entries()) {
+      const lots = 1 + ((j + k) % 3);
+      const status = j % 3 === 0 ? p.status : j % 3 === 1 ? "REFUNDED" : "ALLOTTED";
+      await prisma.ipoApplication.create({
+        data: {
+          ipoId: ipo.id, clientId, lotsApplied: lots, lotsAllotted: status === "ALLOTTED" ? lots : null,
+          amount: lots * p.lotSize * p.priceBandHigh, applicationDate: day(p.open + 1), status, createdAt: day(p.open + 1),
+        },
+      });
+    }
+  }
+
   // ─── Interaction log ────────────────────────────────────────────────────
   const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000);
   const leadByName = async (name: string) => prisma.lead.findFirstOrThrow({ where: { name } });

@@ -23,7 +23,18 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <PageHeader title="Clients" description={scoped ? "Clients assigned to you" : "All clients"} />
+      <PageHeader
+        title="Clients"
+        description={scoped ? "Clients assigned to you" : "All clients"}
+        actions={
+          <a
+            href={`/api/reports/clients?${new URLSearchParams(Object.entries(sp).filter((e): e is [string, string] => typeof e[1] === "string")).toString()}`}
+            className="inline-flex h-9 items-center rounded-md border border-gray-200 bg-white px-3.5 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50"
+          >
+            Export CSV
+          </a>
+        }
+      />
       <PageBody className="space-y-4">
         <FilterBar
           searchPlaceholder="Search name, phone, email, PAN…"
