@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { Card, EmptyState } from "@/components/layout";
 import { formatDateTime } from "@/lib/format";
-import { CLIENT_TYPE_LABELS, KYC_STATUS_LABELS, LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS } from "@/lib/labels";
+import { CLIENT_TYPE_LABELS, IPO_STATUS_LABELS, KYC_STATUS_LABELS, LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS } from "@/lib/labels";
 import { prisma } from "@/lib/prisma";
 
 const FIELD_LABELS: Record<string, string> = {
@@ -15,6 +15,15 @@ const FIELD_LABELS: Record<string, string> = {
   panNumber: "PAN",
   clientType: "client type",
   kycStatus: "KYC status",
+  companyName: "company",
+  symbol: "symbol",
+  exchange: "exchange",
+  priceBandLow: "price band low",
+  priceBandHigh: "price band high",
+  lotSize: "lot size",
+  openDate: "open date",
+  closeDate: "close date",
+  listingDate: "listing date",
 };
 
 const VALUE_LABELS: Record<string, string> = {
@@ -22,6 +31,7 @@ const VALUE_LABELS: Record<string, string> = {
   ...LEAD_SOURCE_LABELS,
   ...CLIENT_TYPE_LABELS,
   ...KYC_STATUS_LABELS,
+  ...IPO_STATUS_LABELS,
 };
 
 type Change = { from: unknown; to: unknown };
@@ -49,12 +59,13 @@ export async function History({ entities, title = "History" }: { entities: { typ
     if (v === null || v === undefined || v === "") return "none";
     if (field === "assignedRmId") return names[v as string] ?? "unknown user";
     if (field === "notes") return "…";
+    if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T00:00:00.000Z$/.test(v)) return v.slice(0, 10);
     return VALUE_LABELS[v as string] ?? String(v);
   };
 
   function describe(entityType: string, action: string, metadata: Prisma.JsonValue) {
     const m = (metadata ?? {}) as Record<string, unknown>;
-    const noun = entityType.toLowerCase();
+    const noun = entityType === "Ipo" ? "IPO" : entityType.toLowerCase();
     switch (action) {
       case "created":
         return `created the ${noun}`;

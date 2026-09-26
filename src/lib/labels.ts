@@ -1,4 +1,4 @@
-import type { ClientType, DocumentCategory, KycStatus, LeadSource, LeadStatus, Role } from "@prisma/client";
+import type { ClientType, DocumentCategory, IpoStatus, KycStatus, LeadSource, LeadStatus, Role } from "@prisma/client";
 
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Admin",
@@ -44,6 +44,13 @@ export const DOCUMENT_CATEGORY_LABELS: Record<DocumentCategory, string> = {
   OTHER: "Other",
 };
 
+export const IPO_STATUS_LABELS: Record<IpoStatus, string> = {
+  UPCOMING: "Upcoming",
+  OPEN: "Open",
+  CLOSED: "Closed",
+  LISTED: "Listed",
+};
+
 type Tone = "gray" | "blue" | "amber" | "green" | "red" | "violet";
 
 export const LEAD_STATUS_TONE: Record<LeadStatus, Tone> = {
@@ -67,6 +74,13 @@ export const ROLE_TONE: Record<Role, Tone> = {
   COMPLIANCE: "amber",
   RM: "blue",
   VIEWER: "gray",
+};
+
+export const IPO_STATUS_TONE: Record<IpoStatus, Tone> = {
+  UPCOMING: "blue",
+  OPEN: "green",
+  CLOSED: "amber",
+  LISTED: "gray",
 };
 
 export function options<T extends string>(labels: Record<T, string>) {

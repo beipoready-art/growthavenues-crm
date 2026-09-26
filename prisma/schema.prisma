@@ -66,6 +66,13 @@ enum DocumentCategory {
   OTHER
 }
 
+enum IpoStatus {
+  UPCOMING
+  OPEN
+  CLOSED
+  LISTED
+}
+
 // ─── Users & auth ─────────────────────────────────────────────────────────
 
 model User {
@@ -86,6 +93,7 @@ model User {
   uploadedDocuments Document[]
   kycStatusChanges  KycStatusChange[]
   auditLogs         AuditLog[]
+  createdIpos       Ipo[]
 
   @@index([role])
 }
@@ -188,4 +196,28 @@ model AuditLog {
   createdAt  DateTime @default(now())
 
   @@index([entityType, entityId, createdAt])
+}
+
+// ─── IPOs (Phase 2) ───────────────────────────────────────────────────────
+
+model Ipo {
+  id            String    @id @default(cuid())
+  companyName   String
+  symbol        String? // exchange symbol once known
+  exchange      String? // e.g. "NSE, BSE"
+  priceBandLow  Decimal   @db.Decimal(12, 2)
+  priceBandHigh Decimal   @db.Decimal(12, 2)
+  lotSize       Int
+  openDate      DateTime  @db.Date
+  closeDate     DateTime  @db.Date
+  listingDate   DateTime? @db.Date
+  status        IpoStatus @default(UPCOMING)
+  notes         String?
+  createdById   String?
+  createdBy     User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([openDate])
 }

@@ -25,6 +25,9 @@ export const PERMISSIONS = {
   "kyc:submit": ["ADMIN", "RM"], // PENDING/REJECTED -> SUBMITTED
   "kyc:review": ["ADMIN", "COMPLIANCE"], // -> UNDER_REVIEW / VERIFIED / REJECTED
 
+  "ipos:view": ["ADMIN", "COMPLIANCE", "RM", "VIEWER"],
+  "ipos:manage": ["ADMIN"],
+
   "dashboard:org": ["ADMIN", "COMPLIANCE", "VIEWER"],
 } as const satisfies Record<string, readonly Role[]>;
 

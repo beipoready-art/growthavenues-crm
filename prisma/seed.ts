@@ -44,6 +44,7 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 async function main() {
   console.log("Resetting data…");
   await prisma.auditLog.deleteMany();
+  await prisma.ipo.deleteMany();
   await prisma.kycStatusChange.deleteMany();
   await prisma.document.deleteMany();
   await prisma.client.deleteMany();
@@ -147,6 +148,40 @@ async function main() {
       data: { entityType: "Lead", entityId: lead.id, action: "converted", userId: c.rm, metadata: { clientId: client.id }, createdAt: daysAgo(c.age) },
     });
   }
+
+  // ─── IPOs ──────────────────────────────────────────────────────────────
+  const day = (offset: number) => {
+    const d = new Date();
+    d.setUTCHours(0, 0, 0, 0);
+    d.setUTCDate(d.getUTCDate() + offset);
+    return d;
+  };
+  const ipos = {
+    open: await prisma.ipo.create({
+      data: {
+        companyName: "Sahyadri Renewables Ltd", symbol: "SAHYADRI", exchange: "NSE, BSE",
+        priceBandLow: 285, priceBandHigh: 300, lotSize: 50,
+        openDate: day(-1), closeDate: day(2), listingDate: day(5), status: "OPEN",
+        notes: "Solar EPC player. Fresh issue + OFS. Retail quota 35%.", createdById: admin.id,
+      },
+    }),
+    upcoming: await prisma.ipo.create({
+      data: {
+        companyName: "Kaveri Fintech Ltd", symbol: "KAVERIFIN", exchange: "NSE, BSE",
+        priceBandLow: 142, priceBandHigh: 150, lotSize: 100,
+        openDate: day(6), closeDate: day(8), listingDate: day(13), status: "UPCOMING",
+        notes: "NBFC focused on MSME lending. RHP filed.", createdById: admin.id,
+      },
+    }),
+    listed: await prisma.ipo.create({
+      data: {
+        companyName: "Nilgiri Foods Ltd", symbol: "NILGIRI", exchange: "NSE",
+        priceBandLow: 410, priceBandHigh: 432, lotSize: 34,
+        openDate: day(-20), closeDate: day(-17), listingDate: day(-12), status: "LISTED",
+        notes: "Listed at 18% premium.", createdById: admin.id,
+      },
+    }),
+  };
 
   console.log(`Seeded. All users share the password: ${PASSWORD}`);
   console.table([
