@@ -102,7 +102,9 @@ export async function History({ entities, title = "History" }: { entities: { typ
     const noun = entityType === "Ipo" ? "IPO" : entityType.toLowerCase();
     switch (action) {
       case "created":
-        return `created the ${noun}`;
+        return m.via === "website" ? `received this enquiry from the website (${String(m.type).replace("_", " ")})` : `created the ${noun}`;
+      case "website_resubmission":
+        return `submitted the website form again (${String(m.type).replace("_", " ")})`;
       case "converted":
         return "converted the lead into a client";
       case "mandate_created":
@@ -143,7 +145,7 @@ export async function History({ entities, title = "History" }: { entities: { typ
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300" />
               <div>
                 <p className="text-gray-700">
-                  <span className="font-medium text-gray-900">{l.user?.name ?? "System"}</span>{" "}
+                  <span className="font-medium text-gray-900">{l.user?.name ?? ((l.metadata as Record<string, unknown> | null)?.via === "website" || l.action === "website_resubmission" ? "Website" : "System")}</span>{" "}
                   {entities.length > 1 && <span className="text-gray-400">[{l.entityType}] </span>}
                   {describe(l.entityType, l.action, l.metadata)}
                 </p>
