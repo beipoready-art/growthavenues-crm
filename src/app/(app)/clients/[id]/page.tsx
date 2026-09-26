@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DetailGrid } from "@/components/detail";
+import { DocumentsPanel } from "@/components/documents-panel";
 import { History } from "@/components/history";
 import { ApplicationsTable, LogApplicationButton } from "@/components/ipo-applications";
 import { Card, EmptyState, PageBody, PageHeader } from "@/components/layout";
@@ -25,9 +26,8 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
       assignedRm: { select: { id: true, name: true } },
       lead: { select: { id: true, createdAt: true } },
       documents: {
-        where: { category: { in: [...KYC_DOCUMENT_CATEGORIES] } },
         include: { uploadedBy: { select: { name: true } } },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { version: "desc" }],
       },
       kycStatusChanges: { include: { changedBy: { select: { name: true } } }, orderBy: { createdAt: "desc" } },
     },
@@ -111,7 +111,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
               clientId={client.id}
               status={client.kycStatus}
               categories={[...KYC_DOCUMENT_CATEGORIES]}
-              documents={client.documents.map((d) => ({
+              documents={client.documents.filter((d) => (KYC_DOCUMENT_CATEGORIES as readonly string[]).includes(d.category)).map((d) => ({
                 id: d.id,
                 category: d.category,
                 fileName: d.fileName,
@@ -144,6 +144,23 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             >
               <ApplicationsTable rows={applications.map((a) => toApplicationRow(a, user))} show="ipo" />
             </Card>
+            <DocumentsPanel
+              clientId={client.id}
+              canUpload={can(user.role, "docs:upload")}
+              documents={client.documents.map((d) => ({
+                id: d.id,
+                groupId: d.groupId,
+                version: d.version,
+                isLatest: d.isLatest,
+                category: d.category,
+                title: d.title,
+                fileName: d.fileName,
+                sizeBytes: d.sizeBytes,
+                notes: d.notes,
+                createdAt: d.createdAt.toISOString(),
+                uploadedBy: d.uploadedBy?.name ?? null,
+              }))}
+            />
           </div>
           <div className="space-y-5 xl:col-span-2">
             <Card title="KYC audit trail">

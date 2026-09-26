@@ -63,6 +63,9 @@ enum DocumentCategory {
   KYC_AADHAAR
   KYC_BANK_PROOF
   KYC_PHOTO
+  CONTRACT_NOTE
+  RISK_DISCLOSURE
+  APPLICATION_FORM
   OTHER
 }
 
@@ -167,15 +170,25 @@ model Document {
   clientId     String
   client       Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
   category     DocumentCategory
+  title        String? // display name; falls back to fileName
   fileName     String // original filename as uploaded
   storageKey   String           @unique // path/key inside the storage backend
   mimeType     String
   sizeBytes    Int
+  // Versioning: every upload is a new row. Versions of one logical document
+  // share `groupId` (the id of version 1); only the newest has isLatest.
+  // Files are never overwritten or deleted.
+  groupId      String
+  version      Int              @default(1)
+  isLatest     Boolean          @default(true)
+  notes        String?
   uploadedById String?
   uploadedBy   User?            @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   createdAt    DateTime         @default(now())
 
+  @@unique([groupId, version])
   @@index([clientId, category])
+  @@index([clientId, isLatest])
 }
 
 model KycStatusChange {

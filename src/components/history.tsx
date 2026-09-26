@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { Card, EmptyState } from "@/components/layout";
 import { formatDateTime, formatINR } from "@/lib/format";
-import { CLIENT_TYPE_LABELS, IPO_APP_STATUS_LABELS, IPO_STATUS_LABELS, KYC_STATUS_LABELS, LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS } from "@/lib/labels";
+import { CLIENT_TYPE_LABELS, DOCUMENT_CATEGORY_LABELS, IPO_APP_STATUS_LABELS, IPO_STATUS_LABELS, KYC_STATUS_LABELS, LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS } from "@/lib/labels";
 import { prisma } from "@/lib/prisma";
 
 const FIELD_LABELS: Record<string, string> = {
@@ -87,7 +87,7 @@ export async function History({ entities, title = "History" }: { entities: { typ
         return `updated ${entityType === "Ipo" ? `${m.client}'s` : `the ${m.ipo}`} application${parts.length ? `: ${parts.join(", ")}` : ""}`;
       }
       case "document_uploaded":
-        return `uploaded a document (${m.fileName ?? "file"})`;
+        return `uploaded ${m.category ? (DOCUMENT_CATEGORY_LABELS[m.category as keyof typeof DOCUMENT_CATEGORY_LABELS] ?? "a document") : "a document"} (${m.fileName ?? "file"}${Number(m.version) > 1 ? `, version ${m.version}` : ""})`;
       case "deleted":
         return `deleted the ${noun}`;
       case "status_changed":

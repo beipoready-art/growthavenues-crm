@@ -22,6 +22,7 @@ export const PERMISSIONS = {
   "clients:assign": ["ADMIN"],
 
   "kyc:upload": ["ADMIN", "RM"],
+  "docs:upload": ["ADMIN", "RM"], // general client documents (contract notes, RDD, forms…)
   "kyc:submit": ["ADMIN", "RM"], // PENDING/REJECTED -> SUBMITTED
   "kyc:review": ["ADMIN", "COMPLIANCE"], // -> UNDER_REVIEW / VERIFIED / REJECTED
 

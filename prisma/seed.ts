@@ -128,8 +128,9 @@ async function main() {
         const data = samplePdf(`${label} - ${c.name} (sample)`);
         await mkdir(path.join(UPLOAD_DIR, "clients", client.id), { recursive: true });
         await writeFile(path.join(UPLOAD_DIR, storageKey), data);
+        const docId = randomUUID();
         await prisma.document.create({
-          data: { clientId: client.id, category, fileName, storageKey, mimeType: "application/pdf", sizeBytes: data.length, uploadedById: c.rm, createdAt: daysAgo(c.age) },
+          data: { id: docId, groupId: docId, clientId: client.id, category, fileName, storageKey, mimeType: "application/pdf", sizeBytes: data.length, uploadedById: c.rm, createdAt: daysAgo(c.age) },
         });
       }
     }
@@ -207,6 +208,30 @@ async function main() {
     },
   });
   void ipos.upcoming;
+
+  // ─── General documents (versioned) ─────────────────────────────────────
+  async function seedDoc(clientId: string, category: "CONTRACT_NOTE" | "RISK_DISCLOSURE" | "APPLICATION_FORM", title: string, versions: { fileName: string; age: number; by: string }[]) {
+    const groupId = randomUUID();
+    for (const [i, v] of versions.entries()) {
+      const storageKey = `clients/${clientId}/${randomUUID()}.pdf`;
+      const data = samplePdf(`${title} v${i + 1} (sample)`);
+      await mkdir(path.join(UPLOAD_DIR, "clients", clientId), { recursive: true });
+      await writeFile(path.join(UPLOAD_DIR, storageKey), data);
+      await prisma.document.create({
+        data: {
+          id: i === 0 ? groupId : randomUUID(), groupId, version: i + 1, isLatest: i === versions.length - 1,
+          clientId, category, title, fileName: v.fileName, storageKey, mimeType: "application/pdf", sizeBytes: data.length,
+          uploadedById: v.by, createdAt: daysAgo(v.age),
+        },
+      });
+    }
+  }
+  await seedDoc(suresh.id, "RISK_DISCLOSURE", "Risk Disclosure Document (signed)", [{ fileName: "rdd-signed.pdf", age: 29, by: rm1.id }]);
+  await seedDoc(suresh.id, "APPLICATION_FORM", "Nilgiri Foods IPO application", [{ fileName: "nilgiri-asba-form.pdf", age: 18, by: rm1.id }]);
+  await seedDoc(suresh.id, "CONTRACT_NOTE", "Contract note – Sep 2026", [
+    { fileName: "cn-sep-2026.pdf", age: 6, by: rm1.id },
+    { fileName: "cn-sep-2026-corrected.pdf", age: 5, by: admin.id },
+  ]);
 
   console.log(`Seeded. All users share the password: ${PASSWORD}`);
   console.table([

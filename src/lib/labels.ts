@@ -41,6 +41,9 @@ export const DOCUMENT_CATEGORY_LABELS: Record<DocumentCategory, string> = {
   KYC_AADHAAR: "Aadhaar",
   KYC_BANK_PROOF: "Bank Proof",
   KYC_PHOTO: "Photograph",
+  CONTRACT_NOTE: "Contract Note",
+  RISK_DISCLOSURE: "Risk Disclosure Document",
+  APPLICATION_FORM: "Application Form",
   OTHER: "Other",
 };
 
