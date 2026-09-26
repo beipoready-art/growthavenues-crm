@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { Card, EmptyState } from "@/components/layout";
-import { formatDateTime } from "@/lib/format";
-import { CLIENT_TYPE_LABELS, IPO_STATUS_LABELS, KYC_STATUS_LABELS, LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS } from "@/lib/labels";
+import { formatDateTime, formatINR } from "@/lib/format";
+import { CLIENT_TYPE_LABELS, IPO_APP_STATUS_LABELS, IPO_STATUS_LABELS, KYC_STATUS_LABELS, LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS } from "@/lib/labels";
 import { prisma } from "@/lib/prisma";
 
 const FIELD_LABELS: Record<string, string> = {
@@ -24,6 +24,9 @@ const FIELD_LABELS: Record<string, string> = {
   openDate: "open date",
   closeDate: "close date",
   listingDate: "listing date",
+  lotsApplied: "lots applied",
+  lotsAllotted: "lots allotted",
+  amount: "amount",
 };
 
 const VALUE_LABELS: Record<string, string> = {
@@ -32,6 +35,7 @@ const VALUE_LABELS: Record<string, string> = {
   ...CLIENT_TYPE_LABELS,
   ...KYC_STATUS_LABELS,
   ...IPO_STATUS_LABELS,
+  ...IPO_APP_STATUS_LABELS,
 };
 
 type Change = { from: unknown; to: unknown };
@@ -59,6 +63,7 @@ export async function History({ entities, title = "History" }: { entities: { typ
     if (v === null || v === undefined || v === "") return "none";
     if (field === "assignedRmId") return names[v as string] ?? "unknown user";
     if (field === "notes") return "…";
+    if (field === "amount") return formatINR(Number(v));
     if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T00:00:00.000Z$/.test(v)) return v.slice(0, 10);
     return VALUE_LABELS[v as string] ?? String(v);
   };
@@ -71,6 +76,16 @@ export async function History({ entities, title = "History" }: { entities: { typ
         return `created the ${noun}`;
       case "converted":
         return "converted the lead into a client";
+      case "ipo_applied":
+        return `logged an IPO application: ${m.ipo} · ${m.lots} lot(s) · ${formatINR(Number(m.amount))}`;
+      case "application_logged":
+        return `logged an application for ${m.client} · ${m.lots} lot(s) · ${formatINR(Number(m.amount))}`;
+      case "ipo_application_updated": {
+        const parts = Object.entries(m)
+          .filter(([k]) => k in FIELD_LABELS)
+          .map(([k, c]) => `${FIELD_LABELS[k]} ${fmt(k, (c as Change).from)} → ${fmt(k, (c as Change).to)}`);
+        return `updated ${entityType === "Ipo" ? `${m.client}'s` : `the ${m.ipo}`} application${parts.length ? `: ${parts.join(", ")}` : ""}`;
+      }
       case "document_uploaded":
         return `uploaded a document (${m.fileName ?? "file"})`;
       case "deleted":

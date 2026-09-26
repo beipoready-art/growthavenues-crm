@@ -2,11 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DetailGrid } from "@/components/detail";
 import { History } from "@/components/history";
+import { ApplicationsTable, LogApplicationButton } from "@/components/ipo-applications";
 import { Card, EmptyState, PageBody, PageHeader } from "@/components/layout";
 import { Badge } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { KYC_DOCUMENT_CATEGORIES, KYC_TRANSITIONS, kycDocsEditable } from "@/lib/kyc";
 import { CLIENT_TYPE_LABELS, KYC_STATUS_LABELS, KYC_STATUS_TONE, LEAD_SOURCE_LABELS } from "@/lib/labels";
+import { applicationInclude, IPO_ACCEPTING_APPLICATIONS, toApplicationRow } from "@/lib/ipo-applications";
 import { prisma } from "@/lib/prisma";
 import { can, ownsRecord } from "@/lib/rbac";
 import { requirePageUser } from "@/lib/session";
@@ -31,7 +33,12 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     },
   });
   if (!client || !ownsRecord(user, client)) notFound();
-  const rms = await listRms();
+  const [rms, applications, openIpos] = await Promise.all([
+    listRms(),
+    prisma.ipoApplication.findMany({ where: { clientId: client.id }, include: applicationInclude, orderBy: { applicationDate: "desc" } }),
+    prisma.ipo.findMany({ where: { status: { in: [...IPO_ACCEPTING_APPLICATIONS] } }, orderBy: { closeDate: "asc" } }),
+  ]);
+  const appliedIpoIds = new Set(applications.map((a) => a.ipoId));
 
   const transitions = KYC_TRANSITIONS.filter((t) => t.from === client.kycStatus && can(user.role, t.permission)).map(({ to, label, requiresNote }) => ({
     to,
@@ -116,6 +123,27 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
               canUpload={can(user.role, "kyc:upload")}
               docsEditable={kycDocsEditable(client.kycStatus)}
             />
+            <Card
+              title="IPO applications"
+              actions={
+                can(user.role, "ipoApps:manage") && (
+                  <LogApplicationButton
+                    clientId={client.id}
+                    ipos={openIpos.map((i) => ({
+                      id: i.id,
+                      companyName: i.companyName,
+                      lotSize: i.lotSize,
+                      priceBandHigh: Number(i.priceBandHigh),
+                      status: i.status,
+                      applied: appliedIpoIds.has(i.id),
+                    }))}
+                    disabledReason={client.kycStatus !== "VERIFIED" ? "KYC must be verified before applying to IPOs" : undefined}
+                  />
+                )
+              }
+            >
+              <ApplicationsTable rows={applications.map((a) => toApplicationRow(a, user))} show="ipo" />
+            </Card>
           </div>
           <div className="space-y-5 xl:col-span-2">
             <Card title="KYC audit trail">

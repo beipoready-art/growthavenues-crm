@@ -1,4 +1,4 @@
-import type { ClientType, DocumentCategory, IpoStatus, KycStatus, LeadSource, LeadStatus, Role } from "@prisma/client";
+import type { ClientType, DocumentCategory, IpoApplicationStatus, IpoStatus, KycStatus, LeadSource, LeadStatus, Role } from "@prisma/client";
 
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Admin",
@@ -51,6 +51,14 @@ export const IPO_STATUS_LABELS: Record<IpoStatus, string> = {
   LISTED: "Listed",
 };
 
+export const IPO_APP_STATUS_LABELS: Record<IpoApplicationStatus, string> = {
+  APPLIED: "Applied",
+  ALLOTTED: "Allotted",
+  PARTIALLY_ALLOTTED: "Partially Allotted",
+  REJECTED: "Rejected",
+  REFUNDED: "Refunded",
+};
+
 type Tone = "gray" | "blue" | "amber" | "green" | "red" | "violet";
 
 export const LEAD_STATUS_TONE: Record<LeadStatus, Tone> = {
@@ -81,6 +89,14 @@ export const IPO_STATUS_TONE: Record<IpoStatus, Tone> = {
   OPEN: "green",
   CLOSED: "amber",
   LISTED: "gray",
+};
+
+export const IPO_APP_STATUS_TONE: Record<IpoApplicationStatus, Tone> = {
+  APPLIED: "blue",
+  ALLOTTED: "green",
+  PARTIALLY_ALLOTTED: "violet",
+  REJECTED: "red",
+  REFUNDED: "gray",
 };
 
 export function options<T extends string>(labels: Record<T, string>) {

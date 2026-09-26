@@ -1,6 +1,8 @@
 import { LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS, KYC_STATUS_LABELS } from "@/lib/labels";
 import { LEAD_SOURCES, LEAD_STATUSES } from "@/lib/leads";
 import { KYC_STATUSES } from "@/lib/kyc";
+import { summarize } from "@/lib/ipo-applications";
+import { STATUS_RANK } from "@/lib/ipos";
 import { prisma } from "@/lib/prisma";
 import { ownedScope } from "@/lib/rbac";
 import type { CurrentUser } from "@/lib/session";
@@ -9,7 +11,8 @@ import type { CurrentUser } from "@/lib/session";
 export async function getDashboard(user: CurrentUser) {
   const scope = ownedScope(user);
 
-  const [totalLeads, totalClients, bySource, byStatus, byRm, byKyc, recentLeads, rms] = await Promise.all([
+  const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const [totalLeads, totalClients, bySource, byStatus, byRm, byKyc, recentLeads, rms, ipos] = await Promise.all([
     prisma.lead.count({ where: scope }),
     prisma.client.count({ where: scope }),
     prisma.lead.groupBy({ by: ["source"], where: scope, _count: { _all: true } }),
@@ -23,6 +26,12 @@ export async function getDashboard(user: CurrentUser) {
       include: { assignedRm: { select: { name: true } } },
     }),
     prisma.user.findMany({ where: { role: "RM" }, select: { id: true, name: true } }),
+    // Active IPOs plus those listed in the last 30 days, with (scoped) applications.
+    prisma.ipo.findMany({
+      where: { OR: [{ status: { in: ["UPCOMING", "OPEN", "CLOSED"] } }, { status: "LISTED", listingDate: { gte: monthAgo } }] },
+      include: { applications: { where: { client: scope }, select: { lotsApplied: true, amount: true, status: true } } },
+      orderBy: { openDate: "desc" },
+    }),
   ]);
 
   const count = <K extends string>(rows: ({ _count: { _all: number } } & Record<string, unknown>)[], key: string, value: K) =>
@@ -41,7 +50,12 @@ export async function getDashboard(user: CurrentUser) {
   const converted = leadsByStatus.find((s) => s.status === "CONVERTED")!.value;
   const openLeads = leadsByStatus.filter((s) => s.status !== "CONVERTED" && s.status !== "LOST").reduce((a, s) => a + s.value, 0);
 
+  const ipoSummary = ipos
+    .sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status])
+    .map((i) => ({ id: i.id, companyName: i.companyName, status: i.status, closeDate: i.closeDate, ...summarize(i.applications) }));
+
   return {
+    ipoSummary,
     totalLeads,
     totalClients,
     openLeads,

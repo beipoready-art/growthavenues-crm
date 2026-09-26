@@ -27,6 +27,7 @@ export const PERMISSIONS = {
 
   "ipos:view": ["ADMIN", "COMPLIANCE", "RM", "VIEWER"],
   "ipos:manage": ["ADMIN"],
+  "ipoApps:manage": ["ADMIN", "RM"], // log applications and update allotment (own clients for RMs)
 
   "dashboard:org": ["ADMIN", "COMPLIANCE", "VIEWER"],
 } as const satisfies Record<string, readonly Role[]>;

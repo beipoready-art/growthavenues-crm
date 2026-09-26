@@ -44,6 +44,7 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 async function main() {
   console.log("Resetting data…");
   await prisma.auditLog.deleteMany();
+  await prisma.ipoApplication.deleteMany();
   await prisma.ipo.deleteMany();
   await prisma.kycStatusChange.deleteMany();
   await prisma.document.deleteMany();
@@ -94,6 +95,7 @@ async function main() {
     { name: "Suresh Patel", phone: "+91 98250 55001", email: "suresh.patel@gmail.com", source: "REFERRAL", pan: "ABCPP1234K", type: "INDIVIDUAL", kyc: "VERIFIED", rm: rm1.id, age: 30 },
     { name: "Patel Family HUF", phone: "+91 98250 55002", source: "REFERRAL", pan: "AAAHP5678L", type: "HUF", kyc: "SUBMITTED", rm: rm1.id, age: 14 },
     { name: "Nimbus Tech Pvt Ltd", phone: "+91 22 4000 1234", email: "accounts@nimbustech.in", source: "WEBSITE", pan: "AADCN9012M", type: "CORPORATE", kyc: "UNDER_REVIEW", rm: rm2.id, age: 10 },
+    { name: "Arjun Kapoor", phone: "+91 98330 44556", email: "arjun.kapoor@gmail.com", source: "WEBSITE", pan: "CKPPK7788R", type: "INDIVIDUAL", kyc: "VERIFIED", rm: rm2.id, age: 25 },
     { name: "Kavita Reddy", phone: "+91 99000 22110", email: "kavita.r@gmail.com", source: "CALL_IN", pan: "BCDPR3456N", type: "INDIVIDUAL", kyc: "PENDING", rm: rm2.id, age: 5 },
   ];
   // KYC path each seeded status went through (audit trail).
@@ -182,6 +184,29 @@ async function main() {
       },
     }),
   };
+
+  // Applications for the verified client (Suresh Patel) on the open and listed IPOs.
+  const suresh = await prisma.client.findFirstOrThrow({ where: { name: "Suresh Patel" } });
+  await prisma.ipoApplication.create({
+    data: {
+      ipoId: ipos.open.id, clientId: suresh.id, lotsApplied: 2, amount: 2 * 50 * 300,
+      applicationDate: day(0), status: "APPLIED", notes: "Retail, UPI mandate accepted", createdById: rm1.id,
+    },
+  });
+  await prisma.ipoApplication.create({
+    data: {
+      ipoId: ipos.listed.id, clientId: suresh.id, lotsApplied: 3, lotsAllotted: 1, amount: 3 * 34 * 432,
+      applicationDate: day(-18), status: "PARTIALLY_ALLOTTED", createdById: rm1.id,
+    },
+  });
+  const arjun = await prisma.client.findFirstOrThrow({ where: { name: "Arjun Kapoor" } });
+  await prisma.ipoApplication.create({
+    data: {
+      ipoId: ipos.listed.id, clientId: arjun.id, lotsApplied: 1, amount: 34 * 432,
+      applicationDate: day(-19), status: "REFUNDED", notes: "Not allotted; funds unblocked", createdById: rm2.id,
+    },
+  });
+  void ipos.upcoming;
 
   console.log(`Seeded. All users share the password: ${PASSWORD}`);
   console.table([

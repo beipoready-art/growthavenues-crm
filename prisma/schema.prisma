@@ -73,6 +73,14 @@ enum IpoStatus {
   LISTED
 }
 
+enum IpoApplicationStatus {
+  APPLIED
+  ALLOTTED
+  PARTIALLY_ALLOTTED
+  REJECTED
+  REFUNDED
+}
+
 // ─── Users & auth ─────────────────────────────────────────────────────────
 
 model User {
@@ -94,6 +102,7 @@ model User {
   kycStatusChanges  KycStatusChange[]
   auditLogs         AuditLog[]
   createdIpos       Ipo[]
+  ipoApplications   IpoApplication[]
 
   @@index([role])
 }
@@ -144,6 +153,7 @@ model Client {
 
   documents        Document[]
   kycStatusChanges KycStatusChange[]
+  ipoApplications  IpoApplication[]
 
   @@index([kycStatus])
   @@index([assignedRmId])
@@ -218,6 +228,31 @@ model Ipo {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  applications IpoApplication[]
+
   @@index([status])
   @@index([openDate])
+}
+
+model IpoApplication {
+  id              String               @id @default(cuid())
+  ipoId           String
+  ipo             Ipo                  @relation(fields: [ipoId], references: [id], onDelete: Restrict)
+  clientId        String
+  client          Client               @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  lotsApplied     Int
+  amount          Decimal              @db.Decimal(14, 2)
+  applicationDate DateTime             @db.Date
+  status          IpoApplicationStatus @default(APPLIED)
+  lotsAllotted    Int?
+  notes           String?
+  createdById     String?
+  createdBy       User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  // One application per client (PAN) per IPO.
+  @@unique([ipoId, clientId])
+  @@index([clientId])
+  @@index([status])
 }
