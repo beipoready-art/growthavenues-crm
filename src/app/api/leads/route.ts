@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { audit } from "@/lib/audit";
 import { PAGE_SIZE, pageParam } from "@/lib/filters";
 import { leadCreateSchema, leadListInclude, leadWhere } from "@/lib/leads";
+import { notify } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/rbac";
 import { handle, HttpError, requireApiUser } from "@/lib/session";
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
     const lead = await prisma.$transaction(async (tx) => {
       const created = await tx.lead.create({ data: { ...input, assignedRmId, createdById: user.id } });
       await audit(tx, { entityType: "Lead", entityId: created.id, action: "created", userId: user.id });
+      await notify(tx, [assignedRmId], { type: "LEAD_ASSIGNED", title: `New lead assigned: ${created.name}`, body: `Assigned by ${user.name}`, link: `/leads/${created.id}` }, user.id);
       return created;
     });
     return NextResponse.json({ lead }, { status: 201 });

@@ -103,6 +103,15 @@ enum TaskStatus {
   DONE
 }
 
+enum NotificationType {
+  KYC_STATUS
+  LEAD_ASSIGNED
+  CLIENT_ASSIGNED
+  TASK_ASSIGNED
+  TASK_DUE
+  IPO_CLOSING
+}
+
 // ─── Users & auth ─────────────────────────────────────────────────────────
 
 model User {
@@ -131,6 +140,8 @@ model User {
   interactionRevisions InteractionRevision[]
   tasksAssigned        Task[]                @relation("TaskAssignee")
   tasksCreated         Task[]                @relation("TaskCreator")
+  notifications        Notification[]
+  ipoInterests         IpoInterest[]
 
   @@index([role])
 }
@@ -186,6 +197,7 @@ model Client {
   ipoApplications  IpoApplication[]
   interactions     Interaction[]
   tasks            Task[]
+  ipoInterests     IpoInterest[]
 
   @@index([kycStatus])
   @@index([assignedRmId])
@@ -271,6 +283,7 @@ model Ipo {
   updatedAt     DateTime  @updatedAt
 
   applications IpoApplication[]
+  interests    IpoInterest[]
 
   @@index([status])
   @@index([openDate])
@@ -370,4 +383,39 @@ model Task {
   @@index([assignedToId, status, dueAt])
   @@index([leadId])
   @@index([clientId])
+}
+
+// Client has shown interest in an IPO (drives "IPO closing soon" alerts
+// until they apply).
+model IpoInterest {
+  id          String   @id @default(cuid())
+  ipoId       String
+  ipo         Ipo      @relation(fields: [ipoId], references: [id], onDelete: Cascade)
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  note        String?
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@unique([ipoId, clientId])
+}
+
+// ─── Notifications (Phase 3) ──────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  // For generated reminders (task due, IPO closing): one per user per key.
+  dedupeKey String?
+  createdAt DateTime         @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt, createdAt])
 }

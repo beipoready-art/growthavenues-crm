@@ -48,6 +48,8 @@ async function main() {
   await prisma.$executeRawUnsafe('TRUNCATE "InteractionRevision", "Interaction"');
   await prisma.auditLog.deleteMany();
   await prisma.task.deleteMany();
+  await prisma.notification.deleteMany();
+  await prisma.ipoInterest.deleteMany();
   await prisma.ipoApplication.deleteMany();
   await prisma.ipo.deleteMany();
   await prisma.kycStatusChange.deleteMany();
@@ -355,6 +357,27 @@ async function main() {
   });
   await prisma.task.create({
     data: { title: "Share Nilgiri allotment status", clientId: suresh.id, dueAt: daysAgo(12), priority: "MEDIUM", status: "DONE", completedAt: daysAgo(12), assignedToId: rm1.id, createdById: rm1.id },
+  });
+
+  // ─── IPO interest & notifications ──────────────────────────────────────
+  // Ankit (Rohan's, KYC verified in the e2e flow) isn't verified in the seed, so use
+  // historical verified clients of Rohan who haven't applied to the open IPO.
+  const rohanVerified = await prisma.client.findMany({
+    where: { assignedRmId: rm1.id, kycStatus: "VERIFIED", ipoApplications: { none: { ipoId: ipos.open.id } } },
+    take: 2,
+    orderBy: { name: "asc" },
+  });
+  for (const c of rohanVerified) {
+    await prisma.ipoInterest.create({ data: { ipoId: ipos.open.id, clientId: c.id, createdById: rm1.id, note: "Asked for price band details" } });
+  }
+  const pattel = await prisma.client.findFirstOrThrow({ where: { name: "Patel Family HUF" } });
+  await prisma.notification.createMany({
+    data: [
+      { userId: compliance.id, type: "KYC_STATUS", title: "KYC submitted: Patel Family HUF", body: "Pending → Submitted by Rohan Sharma", link: `/clients/${pattel.id}`, createdAt: daysAgo(14) },
+      { userId: rm1.id, type: "KYC_STATUS", title: "KYC verified: Suresh Patel", body: "Under Review → Verified by Vikram Rao — All documents verified against originals", link: `/clients/${suresh.id}`, createdAt: daysAgo(28), readAt: daysAgo(27) },
+      { userId: rm1.id, type: "LEAD_ASSIGNED", title: "New lead assigned: Ankit Verma", body: "Assigned by Aarti Mehta", link: `/leads/${ankitLead.id}`, createdAt: daysAgo(1) },
+      { userId: rm2.id, type: "LEAD_ASSIGNED", title: "New lead assigned: Divya Menon", body: "Assigned by Aarti Mehta", link: `/leads/${(await leadByName("Divya Menon")).id}`, createdAt: daysAgo(3) },
+    ],
   });
 
   console.log(`Seeded. All users share the password: ${PASSWORD}`);

@@ -1,6 +1,7 @@
 import type { Prisma, TaskStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { assertCanAccessParent } from "@/lib/interactions";
+import { notify } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { handle, requireApiUser } from "@/lib/session";
 import { resolveAssignee, taskCreateSchema, taskInclude, toTaskRow } from "@/lib/tasks";
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
       data: { ...input, assignedToId, createdById: user.id },
       include: taskInclude,
     });
+    await notify(prisma, [assignedToId], { type: "TASK_ASSIGNED", title: `Task assigned: ${task.title}`, body: `From ${user.name}`, link: "/tasks" }, user.id);
     return NextResponse.json({ task: toTaskRow(task, user) }, { status: 201 });
   });
 }

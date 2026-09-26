@@ -4,6 +4,7 @@ import { DetailGrid } from "@/components/detail";
 import { History } from "@/components/history";
 import { ApplicationsTable } from "@/components/ipo-applications";
 import { EditIpoButton } from "@/components/ipo-form";
+import { InterestToggle } from "@/components/interest-toggle";
 import { StatTile } from "@/components/stat";
 import { Card, EmptyState, PageBody, PageHeader } from "@/components/layout";
 import { Badge } from "@/components/ui";
@@ -27,13 +28,15 @@ export default async function IpoPage({ params }: { params: Promise<{ id: string
     ipo.status === "OPEN" || ipo.status === "UPCOMING"
       ? prisma.client.findMany({
           where: { ...scope, kycStatus: "VERIFIED", ipoApplications: { none: { ipoId: ipo.id } } },
-          select: { id: true, name: true, phone: true, assignedRm: { select: { name: true } } },
+          select: { id: true, name: true, phone: true, assignedRm: { select: { name: true } }, ipoInterests: { where: { ipoId: ipo.id }, select: { id: true } } },
           orderBy: { name: "asc" },
           take: 50,
         })
       : Promise.resolve([]),
   ]);
   const summary = summarize(applications);
+  const interestedCount = notApplied.filter((c) => c.ipoInterests.length > 0).length;
+  const canMarkInterest = can(user.role, "ipoInterest:manage");
   const scoped = isScopedToOwn(user.role);
 
   return (
@@ -87,19 +90,25 @@ export default async function IpoPage({ params }: { params: Promise<{ id: string
           <ApplicationsTable rows={applications.map((a) => toApplicationRow(a, user))} show="client" />
         </Card>
         {(ipo.status === "OPEN" || ipo.status === "UPCOMING") && (
-          <Card title={`Follow up: verified clients not yet applied (${notApplied.length})`}>
+          <Card
+            title={`Follow up: verified clients not yet applied (${notApplied.length})`}
+            actions={<span className="text-xs text-gray-500">{interestedCount} interested · RMs are alerted 2 days before close</span>}
+          >
             {notApplied.length === 0 ? (
               <EmptyState title="Every verified client has applied" />
             ) : (
               <ul className="divide-y divide-gray-100" data-testid="not-applied">
                 {notApplied.map((c) => (
                   <li key={c.id}>
-                    <Link href={`/clients/${c.id}`} className="flex items-center justify-between px-5 py-2.5 text-sm hover:bg-gray-50">
-                      <span className="font-medium text-gray-900">{c.name}</span>
-                      <span className="text-xs text-gray-500">
+                    <div className="flex items-center justify-between gap-4 px-5 py-2.5 text-sm hover:bg-gray-50">
+                      <Link href={`/clients/${c.id}`} className="font-medium text-gray-900 hover:text-brand-600">
+                        {c.name}
+                      </Link>
+                      <span className="flex items-center gap-3 text-xs text-gray-500">
                         {c.phone} · {c.assignedRm?.name ?? "Unassigned"}
+                        <InterestToggle ipoId={ipo.id} clientId={c.id} interested={c.ipoInterests.length > 0} disabled={!canMarkInterest} />
                       </span>
-                    </Link>
+                    </div>
                   </li>
                 ))}
               </ul>

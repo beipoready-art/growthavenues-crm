@@ -3,6 +3,7 @@ import { z } from "zod";
 import { loadClientForUser } from "@/lib/clients";
 import { findTransition, KYC_DOCUMENT_CATEGORIES, KYC_STATUSES } from "@/lib/kyc";
 import { KYC_STATUS_LABELS } from "@/lib/labels";
+import { complianceOfficerIds, notify } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/rbac";
 import { handle, HttpError, requireApiUser } from "@/lib/session";
@@ -41,6 +42,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const change = await tx.kycStatusChange.create({
         data: { clientId: client.id, fromStatus: client.kycStatus, toStatus, note, changedById: user.id },
       });
+      // Notify the client's RM of every change; compliance when KYC lands in their queue.
+      const recipients = [client.assignedRmId, ...(toStatus === "SUBMITTED" ? await complianceOfficerIds(tx) : [])];
+      await notify(
+        tx,
+        recipients,
+        {
+          type: "KYC_STATUS",
+          title: `KYC ${KYC_STATUS_LABELS[toStatus].toLowerCase()}: ${client.name}`,
+          body: `${KYC_STATUS_LABELS[client.kycStatus]} → ${KYC_STATUS_LABELS[toStatus]} by ${user.name}${note ? ` — ${note}` : ""}`,
+          link: `/clients/${client.id}`,
+        },
+        user.id,
+      );
       return [await tx.client.findUniqueOrThrow({ where: { id: client.id } }), change];
     });
     return NextResponse.json({ client: updated, change });

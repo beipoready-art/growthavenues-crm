@@ -86,6 +86,8 @@ export async function History({ entities, title = "History" }: { entities: { typ
           .map(([k, c]) => `${FIELD_LABELS[k]} ${fmt(k, (c as Change).from)} → ${fmt(k, (c as Change).to)}`);
         return `updated ${entityType === "Ipo" ? `${m.client}'s` : `the ${m.ipo}`} application${parts.length ? `: ${parts.join(", ")}` : ""}`;
       }
+      case "ipo_interest":
+        return `marked the client as interested in ${m.ipo}`;
       case "document_uploaded":
         return `uploaded ${m.category ? (DOCUMENT_CATEGORY_LABELS[m.category as keyof typeof DOCUMENT_CATEGORY_LABELS] ?? "a document") : "a document"} (${m.fileName ?? "file"}${Number(m.version) > 1 ? `, version ${m.version}` : ""})`;
       case "deleted":

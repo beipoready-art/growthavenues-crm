@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { notify } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { handle, HttpError, requireApiUser, type CurrentUser } from "@/lib/session";
 import { canTouchTask, resolveAssignee, taskInclude, taskUpdateSchema, toTaskRow } from "@/lib/tasks";
@@ -27,6 +28,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
       },
       include: taskInclude,
     });
+    if (assignedToId) {
+      await notify(prisma, [assignedToId], { type: "TASK_ASSIGNED", title: `Task assigned: ${updated.title}`, body: `From ${user.name}`, link: "/tasks" }, user.id);
+    }
     return NextResponse.json({ task: toTaskRow(updated, user) });
   });
 }

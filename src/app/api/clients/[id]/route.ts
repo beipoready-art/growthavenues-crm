@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { audit, diff } from "@/lib/audit";
 import { clientUpdateSchema, loadClientForUser } from "@/lib/clients";
 import { kycDocsEditable } from "@/lib/kyc";
+import { notify } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/rbac";
 import { handle, HttpError, requireApiUser } from "@/lib/session";
@@ -40,6 +41,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
       const u = await tx.client.update({ where: { id: client.id }, data: input });
       if (Object.keys(changes).length) {
         await audit(tx, { entityType: "Client", entityId: client.id, action: "updated", userId: user.id, metadata: changes as object });
+      }
+      if (changes.assignedRmId && u.assignedRmId) {
+        await notify(tx, [u.assignedRmId], { type: "CLIENT_ASSIGNED", title: `Client assigned to you: ${u.name}`, body: `Reassigned by ${user.name}`, link: `/clients/${u.id}` }, user.id);
       }
       return u;
     });

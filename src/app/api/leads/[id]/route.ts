@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { audit, diff } from "@/lib/audit";
 import { leadUpdateSchema } from "@/lib/leads";
+import { notify } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { can, ownsRecord } from "@/lib/rbac";
 import { handle, HttpError, requireApiUser, type CurrentUser } from "@/lib/session";
@@ -49,6 +50,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
           userId: user.id,
           metadata: changes as object,
         });
+      }
+      if (changes.assignedRmId && u.assignedRmId) {
+        await notify(tx, [u.assignedRmId], { type: "LEAD_ASSIGNED", title: `Lead assigned to you: ${u.name}`, body: `Reassigned by ${user.name}`, link: `/leads/${u.id}` }, user.id);
       }
       return u;
     });
