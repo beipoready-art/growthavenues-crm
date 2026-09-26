@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { LayoutDashboard, LogOut, Users, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, LogOut, Target, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -13,7 +13,12 @@ import { can, type Permission } from "@/lib/rbac";
 type NavItem = { href: string; label: string; icon: LucideIcon; permission?: Permission };
 
 const NAV: { section?: string; items: NavItem[] }[] = [
-  { items: [{ href: "/", label: "Dashboard", icon: LayoutDashboard }] },
+  {
+    items: [
+      { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/leads", label: "Leads", icon: Target, permission: "leads:view" },
+    ],
+  },
   { section: "Admin", items: [{ href: "/users", label: "Users", icon: Users, permission: "users:manage" }] },
 ];
 
