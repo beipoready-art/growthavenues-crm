@@ -1,0 +1,191 @@
+// GrowthAvenues CRM — Prisma schema
+//
+// Design notes (for Phase 2+):
+// - Client is the hub entity. Future modules (IPO applications, interaction
+//   logs, orders) should add their own models with a `clientId` FK rather than
+//   adding columns to Client.
+// - Document is generic: KYC uploads are just documents with a KYC_* category.
+//   A general document vault only needs new DocumentCategory values.
+// - AuditLog is a generic, append-only activity trail keyed by entityType +
+//   entityId, so new entities get history without schema changes.
+// - KycStatusChange is a dedicated, strongly-typed audit table for the KYC
+//   workflow because compliance reporting queries it directly.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  COMPLIANCE
+  RM
+  VIEWER
+}
+
+enum LeadSource {
+  REFERRAL
+  WEBSITE
+  CALL_IN
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CONVERTED
+  LOST
+}
+
+enum ClientType {
+  INDIVIDUAL
+  HUF
+  CORPORATE
+}
+
+enum KycStatus {
+  PENDING
+  SUBMITTED
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+enum DocumentCategory {
+  KYC_PAN
+  KYC_AADHAAR
+  KYC_BANK_PROOF
+  KYC_PHOTO
+  OTHER
+}
+
+// ─── Users & auth ─────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(VIEWER)
+  // Self-signups are created inactive and must be activated by an Admin.
+  active       Boolean  @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assignedLeads     Lead[]            @relation("LeadAssignedRm")
+  createdLeads      Lead[]            @relation("LeadCreatedBy")
+  assignedClients   Client[]          @relation("ClientAssignedRm")
+  uploadedDocuments Document[]
+  kycStatusChanges  KycStatusChange[]
+  auditLogs         AuditLog[]
+
+  @@index([role])
+}
+
+// ─── Leads & clients ──────────────────────────────────────────────────────
+
+model Lead {
+  id           String     @id @default(cuid())
+  name         String
+  phone        String
+  email        String?
+  source       LeadSource @default(OTHER)
+  status       LeadStatus @default(NEW)
+  notes        String?
+  assignedRmId String?
+  assignedRm   User?      @relation("LeadAssignedRm", fields: [assignedRmId], references: [id], onDelete: SetNull)
+  createdById  String?
+  createdBy    User?      @relation("LeadCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  convertedAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Set once the lead is converted. The lead row is kept for history.
+  client Client?
+
+  @@index([status])
+  @@index([assignedRmId])
+  @@index([source])
+  @@index([createdAt])
+}
+
+model Client {
+  id           String     @id @default(cuid())
+  name         String
+  phone        String
+  email        String?
+  source       LeadSource @default(OTHER)
+  panNumber    String?    @unique
+  clientType   ClientType @default(INDIVIDUAL)
+  kycStatus    KycStatus  @default(PENDING)
+  notes        String?
+  assignedRmId String?
+  assignedRm   User?      @relation("ClientAssignedRm", fields: [assignedRmId], references: [id], onDelete: SetNull)
+  leadId       String?    @unique
+  lead         Lead?      @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  documents        Document[]
+  kycStatusChanges KycStatusChange[]
+
+  @@index([kycStatus])
+  @@index([assignedRmId])
+  @@index([createdAt])
+}
+
+// ─── Documents & KYC ──────────────────────────────────────────────────────
+
+model Document {
+  id           String           @id @default(cuid())
+  clientId     String
+  client       Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category     DocumentCategory
+  fileName     String // original filename as uploaded
+  storageKey   String           @unique // path/key inside the storage backend
+  mimeType     String
+  sizeBytes    Int
+  uploadedById String?
+  uploadedBy   User?            @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime         @default(now())
+
+  @@index([clientId, category])
+}
+
+model KycStatusChange {
+  id          String     @id @default(cuid())
+  clientId    String
+  client      Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  fromStatus  KycStatus?
+  toStatus    KycStatus
+  note        String?
+  changedById String?
+  changedBy   User?      @relation(fields: [changedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now())
+
+  @@index([clientId, createdAt])
+}
+
+// ─── Generic audit trail ──────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String // "Lead", "Client", "User", ...
+  entityId   String
+  action     String // "created", "updated", "status_changed", "converted", ...
+  // Arbitrary details, e.g. { field: { from, to } }
+  metadata   Json?
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+}
