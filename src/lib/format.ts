@@ -1,5 +1,8 @@
-const dateFmt = new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+import { APP_TIMEZONE, zonedDateString } from "@/lib/tz";
+
+const dateFmt = new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: APP_TIMEZONE });
 const dateTimeFmt = new Intl.DateTimeFormat("en-IN", {
+  timeZone: APP_TIMEZONE,
   day: "2-digit",
   month: "short",
   year: "numeric",
@@ -36,9 +39,7 @@ export function formatINRCompact(n: number) {
 /** YYYY-MM-DD for <input type="date"> (dates are stored as UTC midnight). */
 export const toDateInput = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 
-/** YYYY-MM-DD in local time (for range inputs built from local-midnight Dates). */
-export function toLocalDateInput(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+/** YYYY-MM-DD in the app timezone (for date-range inputs). */
+export const toLocalDateInput = (d: Date) => zonedDateString(d);
 
 export const formatPct = (n: number) => `${(n * 100).toFixed(n > 0 && n < 0.1 ? 1 : 0)}%`;

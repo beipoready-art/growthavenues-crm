@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { endOfZonedDay } from "../src/lib/tz";
 
 const prisma = new PrismaClient();
 const PASSWORD = "Password@123";
@@ -46,6 +47,7 @@ async function main() {
   // Interactions are protected by a no-delete trigger; TRUNCATE is the reset path.
   await prisma.$executeRawUnsafe('TRUNCATE "InteractionRevision", "Interaction"');
   await prisma.auditLog.deleteMany();
+  await prisma.task.deleteMany();
   await prisma.ipoApplication.deleteMany();
   await prisma.ipo.deleteMany();
   await prisma.kycStatusChange.deleteMany();
@@ -329,6 +331,30 @@ async function main() {
       previousSummary: "Portfolio review. Risk profile: aggressive.", reason: "RM recorded wrong risk profile; corrected per signed form",
       editedById: admin.id, createdAt: daysAgo(9),
     },
+  });
+
+  // ─── Tasks ─────────────────────────────────────────────────────────────
+  const now = Date.now();
+  const endToday = endOfZonedDay(new Date()).getTime();
+  const laterToday = new Date(Math.max(now + 10 * 60 * 1000, Math.min(now + 3 * 60 * 60 * 1000, endToday - 15 * 60 * 1000)));
+  const inDays = (n: number, hour = 11) => {
+    const d = new Date(endToday + n * 86_400_000 - 86_400_000 + 1); // start of day n days ahead (IST)
+    return new Date(d.getTime() + hour * 3_600_000);
+  };
+  const ankitLead = await leadByName("Ankit Verma");
+  await prisma.task.createMany({
+    data: [
+      { title: "Send KYC checklist to Ankit", leadId: ankitLead.id, dueAt: hoursAgo(20), priority: "HIGH", assignedToId: rm1.id, createdById: rm1.id },
+      { title: "Remind Suresh: Sahyadri closes soon", description: "Confirm UPI mandate is approved before cut-off.", clientId: suresh.id, dueAt: laterToday, priority: "HIGH", assignedToId: rm1.id, createdById: rm1.id },
+      { title: "Follow up with Sneha on account opening", leadId: sneha.id, dueAt: inDays(2), priority: "MEDIUM", assignedToId: rm1.id, createdById: rm1.id },
+      { title: "Quarterly portfolio review call", clientId: suresh.id, dueAt: inDays(9, 15), priority: "LOW", assignedToId: rm1.id, createdById: admin.id },
+      { title: "Collect bank proof from Rajesh", leadId: rajesh.id, dueAt: hoursAgo(50), priority: "MEDIUM", assignedToId: rm2.id, createdById: rm2.id },
+      { title: "Pitch Kaveri Fintech IPO to Arjun", clientId: arjun.id, dueAt: inDays(1), priority: "HIGH", assignedToId: rm2.id, createdById: rm2.id },
+      { title: "Review Patel Family HUF KYC", clientId: (await prisma.client.findFirstOrThrow({ where: { name: "Patel Family HUF" } })).id, dueAt: laterToday, priority: "HIGH", assignedToId: compliance.id, createdById: compliance.id },
+    ],
+  });
+  await prisma.task.create({
+    data: { title: "Share Nilgiri allotment status", clientId: suresh.id, dueAt: daysAgo(12), priority: "MEDIUM", status: "DONE", completedAt: daysAgo(12), assignedToId: rm1.id, createdById: rm1.id },
   });
 
   console.log(`Seeded. All users share the password: ${PASSWORD}`);

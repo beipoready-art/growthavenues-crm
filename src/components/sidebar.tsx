@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { BarChart3, Briefcase, LayoutDashboard, Rocket, TrendingUp, LogOut, ShieldCheck, Target, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, Briefcase, CheckSquare, LayoutDashboard, Rocket, TrendingUp, LogOut, ShieldCheck, Target, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -16,6 +16,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
   {
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/tasks", label: "My tasks", icon: CheckSquare, permission: "tasks:manage" },
       { href: "/leads", label: "Leads", icon: Target, permission: "leads:view" },
       { href: "/clients", label: "Clients", icon: Briefcase, permission: "clients:view" },
       { href: "/kyc", label: "KYC queue", icon: ShieldCheck, permission: "clients:view" },
@@ -32,7 +33,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
   { section: "Admin", items: [{ href: "/users", label: "Users", icon: Users, permission: "users:manage" }] },
 ];
 
-export function Sidebar({ user }: { user: { name: string; email: string; role: Role } }) {
+export function Sidebar({ user, badges = {} }: { user: { name: string; email: string; role: Role }; badges?: Record<string, number> }) {
   const pathname = usePathname();
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/"));
 
@@ -60,6 +61,11 @@ export function Sidebar({ user }: { user: { name: string; email: string; role: R
                     >
                       <Icon size={16} className={isActive(href) ? "text-brand-600" : "text-gray-400"} />
                       {label}
+                      {!!badges[href] && (
+                        <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white" data-testid={`badge-${href.slice(1)}`}>
+                          {badges[href]}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 ))}

@@ -92,6 +92,17 @@ enum InteractionType {
   NOTE
 }
 
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TaskStatus {
+  OPEN
+  DONE
+}
+
 // ─── Users & auth ─────────────────────────────────────────────────────────
 
 model User {
@@ -118,6 +129,8 @@ model User {
   interactionsEdited   Interaction[]         @relation("InteractionEditedBy")
   interactionsDeleted  Interaction[]         @relation("InteractionDeletedBy")
   interactionRevisions InteractionRevision[]
+  tasksAssigned        Task[]                @relation("TaskAssignee")
+  tasksCreated         Task[]                @relation("TaskCreator")
 
   @@index([role])
 }
@@ -143,6 +156,7 @@ model Lead {
   // Set once the lead is converted. The lead row is kept for history.
   client       Client?
   interactions Interaction[]
+  tasks        Task[]
 
   @@index([status])
   @@index([assignedRmId])
@@ -171,6 +185,7 @@ model Client {
   kycStatusChanges KycStatusChange[]
   ipoApplications  IpoApplication[]
   interactions     Interaction[]
+  tasks            Task[]
 
   @@index([kycStatus])
   @@index([assignedRmId])
@@ -328,4 +343,31 @@ model InteractionRevision {
   createdAt          DateTime        @default(now())
 
   @@index([interactionId, createdAt])
+}
+
+// ─── Tasks & reminders (Phase 3) ──────────────────────────────────────────
+
+model Task {
+  id           String       @id @default(cuid())
+  title        String
+  description  String?
+  dueAt        DateTime
+  priority     TaskPriority @default(MEDIUM)
+  status       TaskStatus   @default(OPEN)
+  completedAt  DateTime?
+  // Linked to exactly one lead or client (enforced by a CHECK constraint).
+  leadId       String?
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  clientId     String?
+  client       Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  assignedToId String
+  assignedTo   User         @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: Restrict)
+  createdById  String?
+  createdBy    User?        @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([assignedToId, status, dueAt])
+  @@index([leadId])
+  @@index([clientId])
 }

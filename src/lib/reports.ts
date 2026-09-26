@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { LEAD_SOURCE_LABELS } from "@/lib/labels";
 import { LEAD_SOURCES } from "@/lib/leads";
 import { prisma } from "@/lib/prisma";
+import { APP_TIMEZONE, zonedMidnight, zonedParts } from "@/lib/tz";
 import { ownedScope } from "@/lib/rbac";
 import type { CurrentUser } from "@/lib/session";
 
@@ -31,10 +32,11 @@ export async function leadSourceReport(user: CurrentUser, from: Date, to: Date) 
   });
 }
 
-/** Month keys for the trailing `months` months, oldest first, e.g. "2026-04". */
+/** Month keys (app timezone) for the trailing `months` months, oldest first, e.g. "2026-04". */
 export function trailingMonths(months: number, now = new Date()) {
+  const p = zonedParts(now);
   return Array.from({ length: months }, (_, i) => {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1 - i), 1));
+    const d = new Date(Date.UTC(p.year, p.month - 1 - (months - 1 - i), 1));
     return d.toISOString().slice(0, 7);
   });
 }
@@ -44,7 +46,10 @@ const monthLabel = (key: string) => new Intl.DateTimeFormat("en-IN", { month: "s
 /** Monthly pipeline: IPO application value, new leads and conversions (RM-scoped). */
 export async function pipelineByMonth(user: CurrentUser, months = 6) {
   const keys = trailingMonths(months);
-  const since = new Date(keys[0] + "-01T00:00:00Z");
+  const [y, m] = keys[0].split("-").map(Number);
+  const since = zonedMidnight(y, m, 1);
+  // Timestamps are stored in UTC; bucket them by month in the app timezone.
+  const tz = APP_TIMEZONE;
   const rmFilter = user.role === "RM" ? Prisma.sql`AND c."assignedRmId" = ${user.id}` : Prisma.empty;
   const leadRm = user.role === "RM" ? Prisma.sql`AND "assignedRmId" = ${user.id}` : Prisma.empty;
 
@@ -52,13 +57,13 @@ export async function pipelineByMonth(user: CurrentUser, months = 6) {
     prisma.$queryRaw<{ month: string; total: Prisma.Decimal; n: bigint }[]>`
       SELECT to_char(date_trunc('month', a."applicationDate"), 'YYYY-MM') AS month, SUM(a.amount) AS total, COUNT(*) AS n
       FROM "IpoApplication" a JOIN "Client" c ON c.id = a."clientId"
-      WHERE a."applicationDate" >= ${since} ${rmFilter}
+      WHERE a."applicationDate" >= ${keys[0] + "-01"}::date ${rmFilter}
       GROUP BY 1`,
     prisma.$queryRaw<{ month: string; n: bigint }[]>`
-      SELECT to_char(date_trunc('month', "createdAt"), 'YYYY-MM') AS month, COUNT(*) AS n
+      SELECT to_char(date_trunc('month', ("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}), 'YYYY-MM') AS month, COUNT(*) AS n
       FROM "Lead" WHERE "createdAt" >= ${since} ${leadRm} GROUP BY 1`,
     prisma.$queryRaw<{ month: string; n: bigint }[]>`
-      SELECT to_char(date_trunc('month', "convertedAt"), 'YYYY-MM') AS month, COUNT(*) AS n
+      SELECT to_char(date_trunc('month', ("convertedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}), 'YYYY-MM') AS month, COUNT(*) AS n
       FROM "Lead" WHERE "convertedAt" >= ${since} ${leadRm} GROUP BY 1`,
   ]);
   const get = <T extends { month: string }>(rows: T[], k: string) => rows.find((r) => r.month === k);

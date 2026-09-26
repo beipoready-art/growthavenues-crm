@@ -41,6 +41,9 @@ export const PERMISSIONS = {
 
   "reports:view": ["ADMIN", "COMPLIANCE", "RM", "VIEWER"], // data is RM-scoped
 
+  "tasks:manage": ["ADMIN", "COMPLIANCE", "RM"], // own tasks, on leads/clients they can see
+  "tasks:assignOthers": ["ADMIN"],
+
   "dashboard:org": ["ADMIN", "COMPLIANCE", "VIEWER"],
 } as const satisfies Record<string, readonly Role[]>;
 

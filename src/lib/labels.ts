@@ -1,4 +1,4 @@
-import type { ClientType, DocumentCategory, InteractionType, IpoApplicationStatus, IpoStatus, KycStatus, LeadSource, LeadStatus, Role } from "@prisma/client";
+import type { ClientType, DocumentCategory, InteractionType, TaskPriority, IpoApplicationStatus, IpoStatus, KycStatus, LeadSource, LeadStatus, Role } from "@prisma/client";
 
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Admin",
@@ -70,6 +70,12 @@ export const INTERACTION_TYPE_LABELS: Record<InteractionType, string> = {
   NOTE: "Note",
 };
 
+export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  HIGH: "High",
+  MEDIUM: "Medium",
+  LOW: "Low",
+};
+
 type Tone = "gray" | "blue" | "amber" | "green" | "red" | "violet";
 
 export const LEAD_STATUS_TONE: Record<LeadStatus, Tone> = {
@@ -108,6 +114,12 @@ export const IPO_APP_STATUS_TONE: Record<IpoApplicationStatus, Tone> = {
   PARTIALLY_ALLOTTED: "violet",
   REJECTED: "red",
   REFUNDED: "gray",
+};
+
+export const TASK_PRIORITY_TONE: Record<TaskPriority, Tone> = {
+  HIGH: "red",
+  MEDIUM: "amber",
+  LOW: "gray",
 };
 
 export function options<T extends string>(labels: Record<T, string>) {

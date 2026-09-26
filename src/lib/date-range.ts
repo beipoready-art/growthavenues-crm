@@ -1,45 +1,37 @@
 import { param, type SearchParams } from "@/lib/filters";
+import { endOfZonedDay, parseZonedDate, zonedMidnight, zonedParts } from "@/lib/tz";
 
 export const RANGE_PRESETS = ["week", "month", "quarter", "custom"] as const;
 export type RangePreset = (typeof RANGE_PRESETS)[number];
 
 export type ResolvedRange = { preset: RangePreset; from: Date; to: Date; label: string };
 
-const fmt = new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-
-function startOfDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-function endOfDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(23, 59, 59, 999);
-  return x;
-}
+const fmt = (d: Date) => new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: process.env.NEXT_PUBLIC_APP_TIMEZONE || "Asia/Kolkata" }).format(d);
 
 /**
  * Resolves ?range=week|month|quarter|custom (&from=&to= for custom) into a
- * concrete [from, to] window. Weeks start on Monday; quarters are calendar
- * quarters (Jan–Mar, …). Defaults to this month.
+ * concrete [from, to] window in the app timezone. Weeks start on Monday;
+ * quarters are calendar quarters. "to" is the end of today for presets.
  */
 export function resolveRange(sp: SearchParams | URLSearchParams, now = new Date(), fallback: RangePreset = "month"): ResolvedRange {
-  const preset = (RANGE_PRESETS as readonly string[]).includes(param(sp, "range") ?? "") ? (param(sp, "range") as RangePreset) : fallback;
+  const raw = param(sp, "range") ?? "";
+  const preset = (RANGE_PRESETS as readonly string[]).includes(raw) ? (raw as RangePreset) : fallback;
+  const today = zonedParts(now);
+  const endToday = endOfZonedDay(now);
+
   if (preset === "custom") {
-    const f = param(sp, "from");
-    const t = param(sp, "to");
-    const from = f && !isNaN(Date.parse(f)) ? startOfDay(new Date(f + "T00:00:00")) : startOfDay(new Date(now.getFullYear(), now.getMonth(), 1));
-    const to = t && !isNaN(Date.parse(t)) ? endOfDay(new Date(t + "T00:00:00")) : endOfDay(now);
-    return { preset, from, to, label: `${fmt.format(from)} – ${fmt.format(to)}` };
+    const from = parseZonedDate(param(sp, "from") ?? "") ?? zonedMidnight(today.year, today.month, 1);
+    const toStart = parseZonedDate(param(sp, "to") ?? "");
+    const to = toStart ? endOfZonedDay(toStart) : endToday;
+    return { preset, from, to, label: `${fmt(from)} – ${fmt(to)}` };
   }
   if (preset === "week") {
-    const from = startOfDay(now);
-    from.setDate(from.getDate() - ((from.getDay() + 6) % 7));
-    return { preset, from, to: endOfDay(now), label: "This week" };
+    const weekday = new Date(Date.UTC(today.year, today.month - 1, today.day)).getUTCDay(); // 0 = Sunday
+    return { preset, from: zonedMidnight(today.year, today.month, today.day - ((weekday + 6) % 7)), to: endToday, label: "This week" };
   }
   if (preset === "quarter") {
-    const q = Math.floor(now.getMonth() / 3);
-    return { preset, from: new Date(now.getFullYear(), q * 3, 1), to: endOfDay(now), label: `This quarter (Q${q + 1} ${now.getFullYear()})` };
+    const q = Math.floor((today.month - 1) / 3);
+    return { preset, from: zonedMidnight(today.year, q * 3 + 1, 1), to: endToday, label: `This quarter (Q${q + 1} ${today.year})` };
   }
-  return { preset: "month", from: new Date(now.getFullYear(), now.getMonth(), 1), to: endOfDay(now), label: "This month" };
+  return { preset: "month", from: zonedMidnight(today.year, today.month, 1), to: endToday, label: "This month" };
 }

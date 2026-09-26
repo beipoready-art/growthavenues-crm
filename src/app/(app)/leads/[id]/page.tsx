@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { DetailGrid } from "@/components/detail";
 import { History } from "@/components/history";
 import { InteractionLog } from "@/components/interaction-log";
+import { RecordTasks } from "@/components/record-tasks";
 import { Card, PageBody, PageHeader } from "@/components/layout";
 import { Badge } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -89,6 +90,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             </div>
           )}
         </Card>
+        {!lead.client && <RecordTasks user={user} target={{ leadId: lead.id }} />}
         <InteractionLog
           target={{ leadId: lead.id }}
           entries={interactions.map((i) => toTimelineEntry(i, can(user.role, "interactions:viewRemoved")))}

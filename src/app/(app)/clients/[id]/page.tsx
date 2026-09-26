@@ -4,6 +4,7 @@ import { DetailGrid } from "@/components/detail";
 import { DocumentsPanel } from "@/components/documents-panel";
 import { History } from "@/components/history";
 import { InteractionLog } from "@/components/interaction-log";
+import { RecordTasks } from "@/components/record-tasks";
 import { ApplicationsTable, LogApplicationButton } from "@/components/ipo-applications";
 import { Card, EmptyState, PageBody, PageHeader } from "@/components/layout";
 import { Badge } from "@/components/ui";
@@ -153,6 +154,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             </Card>
           </div>
           <div className="space-y-5 xl:col-span-2">
+            <RecordTasks user={user} target={{ clientId: client.id }} />
             <InteractionLog
               target={{ clientId: client.id }}
               entries={interactions.map((i) => toTimelineEntry(i, can(user.role, "interactions:viewRemoved")))}
