@@ -84,28 +84,40 @@ enum IpoApplicationStatus {
   REFUNDED
 }
 
+enum InteractionType {
+  CALL
+  EMAIL
+  MEETING
+  WHATSAPP
+  NOTE
+}
+
 // ─── Users & auth ─────────────────────────────────────────────────────────
 
 model User {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   name         String
-  email        String   @unique
+  email        String    @unique
   passwordHash String
-  role         Role     @default(VIEWER)
+  role         Role      @default(VIEWER)
   // Self-signups are created inactive and must be activated by an Admin.
-  active       Boolean  @default(true)
+  active       Boolean   @default(true)
   lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  assignedLeads     Lead[]            @relation("LeadAssignedRm")
-  createdLeads      Lead[]            @relation("LeadCreatedBy")
-  assignedClients   Client[]          @relation("ClientAssignedRm")
-  uploadedDocuments Document[]
-  kycStatusChanges  KycStatusChange[]
-  auditLogs         AuditLog[]
-  createdIpos       Ipo[]
-  ipoApplications   IpoApplication[]
+  assignedLeads        Lead[]                @relation("LeadAssignedRm")
+  createdLeads         Lead[]                @relation("LeadCreatedBy")
+  assignedClients      Client[]              @relation("ClientAssignedRm")
+  uploadedDocuments    Document[]
+  kycStatusChanges     KycStatusChange[]
+  auditLogs            AuditLog[]
+  createdIpos          Ipo[]
+  ipoApplications      IpoApplication[]
+  interactionsLogged   Interaction[]         @relation("InteractionLoggedBy")
+  interactionsEdited   Interaction[]         @relation("InteractionEditedBy")
+  interactionsDeleted  Interaction[]         @relation("InteractionDeletedBy")
+  interactionRevisions InteractionRevision[]
 
   @@index([role])
 }
@@ -129,7 +141,8 @@ model Lead {
   updatedAt    DateTime   @updatedAt
 
   // Set once the lead is converted. The lead row is kept for history.
-  client Client?
+  client       Client?
+  interactions Interaction[]
 
   @@index([status])
   @@index([assignedRmId])
@@ -157,6 +170,7 @@ model Client {
   documents        Document[]
   kycStatusChanges KycStatusChange[]
   ipoApplications  IpoApplication[]
+  interactions     Interaction[]
 
   @@index([kycStatus])
   @@index([assignedRmId])
@@ -268,4 +282,50 @@ model IpoApplication {
   @@unique([ipoId, clientId])
   @@index([clientId])
   @@index([status])
+}
+
+// ─── Interaction log (Phase 2) ────────────────────────────────────────────
+// Permanent communication record for compliance continuity. Rows are never
+// hard-deleted: Admin edits keep the prior text in InteractionRevision and
+// Admin "deletes" are soft deletes with a mandatory reason.
+
+model Interaction {
+  id           String          @id @default(cuid())
+  type         InteractionType
+  occurredAt   DateTime
+  summary      String
+  leadId       String?
+  lead         Lead?           @relation(fields: [leadId], references: [id], onDelete: Restrict)
+  clientId     String?
+  client       Client?         @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  loggedById   String
+  loggedBy     User            @relation("InteractionLoggedBy", fields: [loggedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime        @default(now())
+  editedAt     DateTime?
+  editedById   String?
+  editedBy     User?           @relation("InteractionEditedBy", fields: [editedById], references: [id], onDelete: Restrict)
+  deletedAt    DateTime?
+  deletedById  String?
+  deletedBy    User?           @relation("InteractionDeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
+  deleteReason String?
+
+  revisions InteractionRevision[]
+
+  @@index([leadId, occurredAt])
+  @@index([clientId, occurredAt])
+}
+
+model InteractionRevision {
+  id                 String          @id @default(cuid())
+  interactionId      String
+  interaction        Interaction     @relation(fields: [interactionId], references: [id], onDelete: Restrict)
+  previousType       InteractionType
+  previousOccurredAt DateTime
+  previousSummary    String
+  reason             String
+  editedById         String
+  editedBy           User            @relation(fields: [editedById], references: [id], onDelete: Restrict)
+  createdAt          DateTime        @default(now())
+
+  @@index([interactionId, createdAt])
 }

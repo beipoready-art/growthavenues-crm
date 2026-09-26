@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { DetailGrid } from "@/components/detail";
 import { DocumentsPanel } from "@/components/documents-panel";
 import { History } from "@/components/history";
+import { InteractionLog } from "@/components/interaction-log";
 import { ApplicationsTable, LogApplicationButton } from "@/components/ipo-applications";
 import { Card, EmptyState, PageBody, PageHeader } from "@/components/layout";
 import { Badge } from "@/components/ui";
@@ -10,6 +11,7 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { KYC_DOCUMENT_CATEGORIES, KYC_TRANSITIONS, kycDocsEditable } from "@/lib/kyc";
 import { CLIENT_TYPE_LABELS, KYC_STATUS_LABELS, KYC_STATUS_TONE, LEAD_SOURCE_LABELS } from "@/lib/labels";
 import { applicationInclude, IPO_ACCEPTING_APPLICATIONS, toApplicationRow } from "@/lib/ipo-applications";
+import { interactionInclude, timelineWhere, toTimelineEntry } from "@/lib/interactions";
 import { prisma } from "@/lib/prisma";
 import { can, ownsRecord } from "@/lib/rbac";
 import { requirePageUser } from "@/lib/session";
@@ -33,10 +35,15 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     },
   });
   if (!client || !ownsRecord(user, client)) notFound();
-  const [rms, applications, openIpos] = await Promise.all([
+  const [rms, applications, openIpos, interactions] = await Promise.all([
     listRms(),
     prisma.ipoApplication.findMany({ where: { clientId: client.id }, include: applicationInclude, orderBy: { applicationDate: "desc" } }),
     prisma.ipo.findMany({ where: { status: { in: [...IPO_ACCEPTING_APPLICATIONS] } }, orderBy: { closeDate: "asc" } }),
+    prisma.interaction.findMany({
+      where: timelineWhere({ clientId: client.id, originLeadId: client.leadId }),
+      include: interactionInclude,
+      orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+    }),
   ]);
   const appliedIpoIds = new Set(applications.map((a) => a.ipoId));
 
@@ -144,25 +151,14 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             >
               <ApplicationsTable rows={applications.map((a) => toApplicationRow(a, user))} show="ipo" />
             </Card>
-            <DocumentsPanel
-              clientId={client.id}
-              canUpload={can(user.role, "docs:upload")}
-              documents={client.documents.map((d) => ({
-                id: d.id,
-                groupId: d.groupId,
-                version: d.version,
-                isLatest: d.isLatest,
-                category: d.category,
-                title: d.title,
-                fileName: d.fileName,
-                sizeBytes: d.sizeBytes,
-                notes: d.notes,
-                createdAt: d.createdAt.toISOString(),
-                uploadedBy: d.uploadedBy?.name ?? null,
-              }))}
-            />
           </div>
           <div className="space-y-5 xl:col-span-2">
+            <InteractionLog
+              target={{ clientId: client.id }}
+              entries={interactions.map((i) => toTimelineEntry(i, can(user.role, "interactions:viewRemoved")))}
+              canLog={can(user.role, "interactions:log")}
+              canAmend={can(user.role, "interactions:amend")}
+            />
             <Card title="KYC audit trail">
               {client.kycStatusChanges.length === 0 ? (
                 <EmptyState title="No KYC changes yet" />
@@ -191,6 +187,23 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             <History entities={[{ type: "Client", id: client.id }, ...(client.lead ? [{ type: "Lead", id: client.lead.id }] : [])]} title="Activity (client & lead)" />
           </div>
         </div>
+        <DocumentsPanel
+          clientId={client.id}
+          canUpload={can(user.role, "docs:upload")}
+          documents={client.documents.map((d) => ({
+            id: d.id,
+            groupId: d.groupId,
+            version: d.version,
+            isLatest: d.isLatest,
+            category: d.category,
+            title: d.title,
+            fileName: d.fileName,
+            sizeBytes: d.sizeBytes,
+            notes: d.notes,
+            createdAt: d.createdAt.toISOString(),
+            uploadedBy: d.uploadedBy?.name ?? null,
+          }))}
+        />
       </PageBody>
     </>
   );

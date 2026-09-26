@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DetailGrid } from "@/components/detail";
 import { History } from "@/components/history";
+import { InteractionLog } from "@/components/interaction-log";
 import { Card, PageBody, PageHeader } from "@/components/layout";
 import { Badge } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS, LEAD_STATUS_TONE } from "@/lib/labels";
+import { interactionInclude, timelineWhere, toTimelineEntry } from "@/lib/interactions";
 import { prisma } from "@/lib/prisma";
 import { can, ownsRecord } from "@/lib/rbac";
 import { requirePageUser } from "@/lib/session";
@@ -24,7 +26,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     },
   });
   if (!lead || !ownsRecord(user, lead)) notFound();
-  const rms = await listRms();
+  const [rms, interactions] = await Promise.all([
+    listRms(),
+    prisma.interaction.findMany({ where: timelineWhere({ leadId: lead.id }), include: interactionInclude, orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }] }),
+  ]);
   const converted = lead.status === "CONVERTED";
 
   return (
@@ -84,6 +89,12 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             </div>
           )}
         </Card>
+        <InteractionLog
+          target={{ leadId: lead.id }}
+          entries={interactions.map((i) => toTimelineEntry(i, can(user.role, "interactions:viewRemoved")))}
+          canLog={can(user.role, "interactions:log") && !lead.client}
+          canAmend={can(user.role, "interactions:amend")}
+        />
         <History entities={[{ type: "Lead", id: lead.id }]} />
       </PageBody>
     </>

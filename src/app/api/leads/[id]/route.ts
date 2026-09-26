@@ -61,6 +61,9 @@ export async function DELETE(_req: Request, { params }: Ctx) {
     const user = await requireApiUser("leads:delete");
     const lead = await loadLead(user, (await params).id);
     if (lead.client) throw new HttpError(400, "This lead has been converted and cannot be deleted");
+    if (await prisma.interaction.count({ where: { leadId: lead.id } })) {
+      throw new HttpError(400, "This lead has logged interactions, which are a permanent record. Mark it as Lost instead.");
+    }
     await prisma.$transaction([
       prisma.lead.delete({ where: { id: lead.id } }),
       prisma.auditLog.create({ data: { entityType: "Lead", entityId: lead.id, action: "deleted", userId: user.id, metadata: { name: lead.name } } }),

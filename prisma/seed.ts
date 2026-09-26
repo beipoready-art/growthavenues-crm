@@ -43,6 +43,8 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 
 async function main() {
   console.log("Resetting data…");
+  // Interactions are protected by a no-delete trigger; TRUNCATE is the reset path.
+  await prisma.$executeRawUnsafe('TRUNCATE "InteractionRevision", "Interaction"');
   await prisma.auditLog.deleteMany();
   await prisma.ipoApplication.deleteMany();
   await prisma.ipo.deleteMany();
@@ -232,6 +234,35 @@ async function main() {
     { fileName: "cn-sep-2026.pdf", age: 6, by: rm1.id },
     { fileName: "cn-sep-2026-corrected.pdf", age: 5, by: admin.id },
   ]);
+
+  // ─── Interaction log ────────────────────────────────────────────────────
+  const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000);
+  const leadByName = async (name: string) => prisma.lead.findFirstOrThrow({ where: { name } });
+  const sneha = await leadByName("Sneha Kulkarni");
+  const rajesh = await leadByName("Rajesh Iyer");
+  const sureshLead = await leadByName("Suresh Patel");
+  await prisma.interaction.createMany({
+    data: [
+      { leadId: sneha.id, type: "CALL", occurredAt: hoursAgo(80), summary: "Intro call. Interested in IPO investing; wants details of upcoming issues.", loggedById: rm1.id },
+      { leadId: sneha.id, type: "EMAIL", occurredAt: hoursAgo(60), summary: "Sent account opening checklist and brokerage schedule.", loggedById: rm1.id },
+      { leadId: rajesh.id, type: "MEETING", occurredAt: hoursAgo(30), summary: "Met at office. Ready to open account; will share PAN and bank details.", loggedById: rm2.id },
+      { leadId: sureshLead.id, type: "CALL", occurredAt: daysAgo(35), summary: "Referral from existing client. Discussed demat + IPO advisory.", loggedById: rm1.id },
+      { clientId: suresh.id, type: "WHATSAPP", occurredAt: hoursAgo(20), summary: "Shared Sahyadri Renewables IPO note. Client wants 2 lots.", loggedById: rm1.id },
+      { clientId: suresh.id, type: "NOTE", occurredAt: hoursAgo(5), summary: "Client confirmed UPI mandate for Sahyadri application.", loggedById: rm1.id },
+      { clientId: arjun.id, type: "CALL", occurredAt: hoursAgo(26), summary: "Explained Nilgiri refund timeline; funds unblocked.", loggedById: rm2.id },
+    ],
+  });
+  // One entry corrected by an admin, with its revision preserved.
+  const corrected = await prisma.interaction.create({
+    data: { clientId: suresh.id, type: "MEETING", occurredAt: daysAgo(10), summary: "Portfolio review. Risk profile: moderate.", loggedById: rm1.id, editedAt: daysAgo(9), editedById: admin.id },
+  });
+  await prisma.interactionRevision.create({
+    data: {
+      interactionId: corrected.id, previousType: "MEETING", previousOccurredAt: daysAgo(10),
+      previousSummary: "Portfolio review. Risk profile: aggressive.", reason: "RM recorded wrong risk profile; corrected per signed form",
+      editedById: admin.id, createdAt: daysAgo(9),
+    },
+  });
 
   console.log(`Seeded. All users share the password: ${PASSWORD}`);
   console.table([

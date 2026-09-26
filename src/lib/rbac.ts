@@ -30,6 +30,10 @@ export const PERMISSIONS = {
   "ipos:manage": ["ADMIN"],
   "ipoApps:manage": ["ADMIN", "RM"], // log applications and update allotment (own clients for RMs)
 
+  "interactions:log": ["ADMIN", "COMPLIANCE", "RM"], // on leads/clients they can see
+  "interactions:amend": ["ADMIN"], // edit or soft-delete, always with a reason
+  "interactions:viewRemoved": ["ADMIN", "COMPLIANCE"], // see text of removed entries
+
   "dashboard:org": ["ADMIN", "COMPLIANCE", "VIEWER"],
 } as const satisfies Record<string, readonly Role[]>;
 

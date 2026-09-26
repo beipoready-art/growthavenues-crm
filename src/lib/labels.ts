@@ -1,4 +1,4 @@
-import type { ClientType, DocumentCategory, IpoApplicationStatus, IpoStatus, KycStatus, LeadSource, LeadStatus, Role } from "@prisma/client";
+import type { ClientType, DocumentCategory, InteractionType, IpoApplicationStatus, IpoStatus, KycStatus, LeadSource, LeadStatus, Role } from "@prisma/client";
 
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Admin",
@@ -60,6 +60,14 @@ export const IPO_APP_STATUS_LABELS: Record<IpoApplicationStatus, string> = {
   PARTIALLY_ALLOTTED: "Partially Allotted",
   REJECTED: "Rejected",
   REFUNDED: "Refunded",
+};
+
+export const INTERACTION_TYPE_LABELS: Record<InteractionType, string> = {
+  CALL: "Call",
+  EMAIL: "Email",
+  MEETING: "Meeting",
+  WHATSAPP: "WhatsApp",
+  NOTE: "Note",
 };
 
 type Tone = "gray" | "blue" | "amber" | "green" | "red" | "violet";
