@@ -34,6 +34,11 @@ export const PERMISSIONS = {
   "interactions:amend": ["ADMIN"], // edit or soft-delete, always with a reason
   "interactions:viewRemoved": ["ADMIN", "COMPLIANCE"], // see text of removed entries
 
+  "performance:view": ["ADMIN", "COMPLIANCE", "RM"],
+  "performance:viewAll": ["ADMIN", "COMPLIANCE"],
+  "performance:viewOwn": ["RM"],
+  "performance:leaderboard": ["ADMIN"],
+
   "dashboard:org": ["ADMIN", "COMPLIANCE", "VIEWER"],
 } as const satisfies Record<string, readonly Role[]>;
 
