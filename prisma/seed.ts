@@ -1,9 +1,43 @@
 /* eslint-disable no-console */
 import { PrismaClient, type ClientType, type KycStatus, type LeadSource, type LeadStatus, type Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "node:crypto";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
 
 const prisma = new PrismaClient();
 const PASSWORD = "Password@123";
+
+const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR ?? "./uploads");
+
+/** A tiny one-page PDF so seeded KYC documents can be opened. */
+function samplePdf(text: string) {
+  const stream = `BT /F1 18 Tf 72 720 Td (${text.replace(/[()\\]/g, "")}) Tj ET`;
+  const objs = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  let out = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  objs.forEach((o, i) => {
+    offsets.push(out.length);
+    out += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("");
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out);
+}
+
+const KYC_DOCS = [
+  ["KYC_PAN", "pan-card.pdf", "PAN card"],
+  ["KYC_AADHAAR", "aadhaar.pdf", "Aadhaar"],
+  ["KYC_BANK_PROOF", "cancelled-cheque.pdf", "Bank proof"],
+  ["KYC_PHOTO", "photo.pdf", "Photograph"],
+] as const;
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 
@@ -15,6 +49,7 @@ async function main() {
   await prisma.client.deleteMany();
   await prisma.lead.deleteMany();
   await prisma.user.deleteMany();
+  await rm(path.join(UPLOAD_DIR, "clients"), { recursive: true, force: true });
 
   const passwordHash = await bcrypt.hash(PASSWORD, 12);
   const mkUser = (name: string, email: string, role: Role, active = true) =>
@@ -61,7 +96,7 @@ async function main() {
     { name: "Kavita Reddy", phone: "+91 99000 22110", email: "kavita.r@gmail.com", source: "CALL_IN", pan: "BCDPR3456N", type: "INDIVIDUAL", kyc: "PENDING", rm: rm2.id, age: 5 },
   ];
   // KYC path each seeded status went through (audit trail).
-  const path: Record<KycStatus, KycStatus[]> = {
+  const kycPath: Record<KycStatus, KycStatus[]> = {
     PENDING: [],
     SUBMITTED: ["SUBMITTED"],
     UNDER_REVIEW: ["SUBMITTED", "UNDER_REVIEW"],
@@ -81,8 +116,22 @@ async function main() {
         kycStatus: c.kyc, assignedRmId: c.rm, leadId: lead.id, createdAt: daysAgo(c.age),
       },
     });
+    await prisma.kycStatusChange.create({
+      data: { clientId: client.id, fromStatus: null, toStatus: "PENDING", changedById: c.rm, note: "Client created from lead", createdAt: daysAgo(c.age) },
+    });
+    if (c.kyc !== "PENDING") {
+      for (const [category, fileName, label] of KYC_DOCS) {
+        const storageKey = `clients/${client.id}/${randomUUID()}.pdf`;
+        const data = samplePdf(`${label} - ${c.name} (sample)`);
+        await mkdir(path.join(UPLOAD_DIR, "clients", client.id), { recursive: true });
+        await writeFile(path.join(UPLOAD_DIR, storageKey), data);
+        await prisma.document.create({
+          data: { clientId: client.id, category, fileName, storageKey, mimeType: "application/pdf", sizeBytes: data.length, uploadedById: c.rm, createdAt: daysAgo(c.age) },
+        });
+      }
+    }
     let from: KycStatus = "PENDING";
-    const steps = path[c.kyc];
+    const steps = kycPath[c.kyc];
     for (const [i, to] of steps.entries()) {
       await prisma.kycStatusChange.create({
         data: {

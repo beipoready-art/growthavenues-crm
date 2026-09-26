@@ -60,6 +60,8 @@ export async function History({ entities, title = "History" }: { entities: { typ
         return `created the ${noun}`;
       case "converted":
         return "converted the lead into a client";
+      case "document_uploaded":
+        return `uploaded a document (${m.fileName ?? "file"})`;
       case "deleted":
         return `deleted the ${noun}`;
       case "status_changed":
