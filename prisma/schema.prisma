@@ -19,9 +19,14 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// DATABASE_URL: the app's connection. On Supabase use the pooled
+// ("Transaction pooler", port 6543, add ?pgbouncer=true) URI.
+// DIRECT_URL: a direct / session connection used by `prisma migrate`.
+// Locally both can be the same URL.
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────
@@ -166,6 +171,31 @@ enum NotificationType {
   MANDATE_DUE
 }
 
+enum IntegrationProvider {
+  GOOGLE
+  MICROSOFT
+}
+
+enum MeetingProvider {
+  GOOGLE_MEET
+  TEAMS
+  ZOOM
+  PHONE
+  IN_PERSON
+  OTHER
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum EmailDirection {
+  INBOUND
+  OUTBOUND
+}
+
 // ─── Users & auth ─────────────────────────────────────────────────────────
 
 model User {
@@ -197,6 +227,9 @@ model User {
   tasksAssigned        Task[]                @relation("TaskAssignee")
   tasksCreated         Task[]                @relation("TaskCreator")
   notifications        Notification[]
+  connectedAccounts    ConnectedAccount[]
+  meetingsOrganized    Meeting[]
+  emailMessages        EmailMessage[]
 
   @@index([role])
 }
@@ -234,6 +267,8 @@ model Lead {
   interactions Interaction[]
   tasks        Task[]
   contacts     Contact[]
+  meetings     Meeting[]
+  emails       EmailMessage[]
 
   @@index([status])
   @@index([assignedRmId])
@@ -278,6 +313,8 @@ model Client {
   tasks            Task[]
   contacts         Contact[]
   mandates         Mandate[]
+  meetings         Meeting[]
+  emails           EmailMessage[]
 
   @@index([kycStatus])
   @@index([assignedRmId])
@@ -533,6 +570,7 @@ model Mandate {
 
   stageChanges MandateStageChange[]
   documents    Document[]
+  meetings     Meeting[]
 
   @@index([stage])
   @@index([clientId])
@@ -551,4 +589,94 @@ model MandateStageChange {
   createdAt   DateTime      @default(now())
 
   @@index([mandateId, createdAt])
+}
+
+// ─── Integrations: Google / Microsoft accounts ────────────────────────────
+// A user's connected mailbox + calendar. Tokens are encrypted at rest
+// (AES-256-GCM, see src/lib/crypto.ts).
+
+model ConnectedAccount {
+  id           String              @id @default(cuid())
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     IntegrationProvider
+  email        String
+  accessToken  String // encrypted
+  refreshToken String? // encrypted
+  expiresAt    DateTime?
+  scopes       String?
+  lastSyncAt   DateTime?
+  syncError    String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  emails EmailMessage[]
+
+  @@unique([userId, provider])
+}
+
+// ─── Meetings ─────────────────────────────────────────────────────────────
+
+model Meeting {
+  id               String               @id @default(cuid())
+  title            String
+  agenda           String?
+  startAt          DateTime
+  endAt            DateTime
+  provider         MeetingProvider
+  joinUrl          String?
+  location         String?
+  // Calendar event created in the organiser's Google / Microsoft calendar.
+  externalProvider IntegrationProvider?
+  externalEventId  String?
+  attendees        Json // [{ name?, email }]
+  status           MeetingStatus        @default(SCHEDULED)
+  outcome          String?
+  leadId           String?
+  lead             Lead?                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  clientId         String?
+  client           Client?              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  mandateId        String?
+  mandate          Mandate?             @relation(fields: [mandateId], references: [id], onDelete: SetNull)
+  organizerId      String
+  organizer        User                 @relation(fields: [organizerId], references: [id], onDelete: Restrict)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([organizerId, startAt])
+  @@index([clientId, startAt])
+  @@index([leadId, startAt])
+}
+
+// ─── Email conversations ──────────────────────────────────────────────────
+// Only messages exchanged with a known lead/client contact are stored.
+
+model EmailMessage {
+  id         String              @id @default(cuid())
+  accountId  String?
+  account    ConnectedAccount?   @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  provider   IntegrationProvider
+  externalId String
+  threadId   String?
+  subject    String
+  snippet    String?
+  bodyText   String?
+  fromEmail  String
+  fromName   String?
+  toEmails   String[]
+  ccEmails   String[]
+  sentAt     DateTime
+  direction  EmailDirection
+  userId     String // mailbox owner
+  user       User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  leadId     String?
+  lead       Lead?               @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  clientId   String?
+  client     Client?             @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  createdAt  DateTime            @default(now())
+
+  @@unique([provider, userId, externalId])
+  @@index([clientId, sentAt])
+  @@index([leadId, sentAt])
+  @@index([threadId])
 }

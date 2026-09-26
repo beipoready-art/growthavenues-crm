@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DetailGrid } from "@/components/detail";
+import { EmailsCard } from "@/components/emails-card";
 import { History } from "@/components/history";
+import { MeetingsCard } from "@/components/meetings-card";
 import { InteractionLog } from "@/components/interaction-log";
 import { RecordTasks } from "@/components/record-tasks";
 import { Card, PageBody, PageHeader } from "@/components/layout";
@@ -10,6 +12,7 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS, LEAD_STATUS_TONE, SERVICE_LABELS } from "@/lib/labels";
 import { interactionInclude, timelineWhere, toTimelineEntry } from "@/lib/interactions";
 import { prisma } from "@/lib/prisma";
+import { loadRecordComms } from "@/lib/record-comms";
 import { can, ownsRecord } from "@/lib/rbac";
 import { requirePageUser } from "@/lib/session";
 import { listRms } from "@/lib/users";
@@ -27,8 +30,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     },
   });
   if (!lead || !ownsRecord(user, lead)) notFound();
-  const [rms, interactions] = await Promise.all([
+  const [rms, comms, interactions] = await Promise.all([
     listRms(),
+    loadRecordComms(user, { leadId: lead.id }),
     prisma.interaction.findMany({ where: timelineWhere({ leadId: lead.id }), include: interactionInclude, orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }] }),
   ]);
   const converted = lead.status === "CONVERTED";
@@ -114,7 +118,23 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             </div>
           )}
         </Card>
-        {!lead.client && <RecordTasks user={user} target={{ leadId: lead.id }} />}
+        <div className="grid gap-5 xl:grid-cols-2">
+          <MeetingsCard
+            parent={{ leadId: lead.id }}
+            meetings={comms.meetings}
+            contacts={[{ name: lead.name, email: lead.email }]}
+            connected={comms.connected}
+            canSchedule={can(user.role, "meetings:manage") && !lead.client}
+          />
+          {!lead.client && <RecordTasks user={user} target={{ leadId: lead.id }} />}
+        </div>
+        <EmailsCard
+          parent={{ leadId: lead.id }}
+          emails={comms.emails}
+          recipients={lead.email ? [{ name: lead.name, email: lead.email }] : []}
+          connected={comms.connected}
+          canSend={can(user.role, "emails:send") && !lead.client}
+        />
         <InteractionLog
           target={{ leadId: lead.id }}
           entries={interactions.map((i) => toTimelineEntry(i, can(user.role, "interactions:viewRemoved")))}

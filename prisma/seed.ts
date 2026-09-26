@@ -109,6 +109,9 @@ async function main() {
   // Interactions are protected by a no-delete trigger; TRUNCATE is the reset path.
   await prisma.$executeRawUnsafe('TRUNCATE "InteractionRevision", "Interaction"');
   await prisma.auditLog.deleteMany();
+  await prisma.emailMessage.deleteMany();
+  await prisma.meeting.deleteMany();
+  await prisma.connectedAccount.deleteMany();
   await prisma.task.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.mandateStageChange.deleteMany();
@@ -416,6 +419,45 @@ async function main() {
   await prisma.task.create({
     data: { title: "Circulate Nilgiri listing-day note", clientId: clients["Nilgiri Foods Ltd"].id, dueAt: daysAgo(12), priority: "MEDIUM", status: "DONE", completedAt: daysAgo(12), assignedToId: rm1.id, createdById: rm1.id },
   });
+
+  // ─── Meetings ──────────────────────────────────────────────────────────
+  const at = (dayOffset: number, hour: number, minute = 0) => new Date(endToday + 1 + (dayOffset - 1) * DAY + (hour * 60 + minute) * 60_000);
+  const kaveri = clients["Kaveri Agro Foods Ltd"];
+  await prisma.meeting.createMany({
+    data: [
+      {
+        title: "Listing-day plan with Sahyadri promoters", agenda: "Listing ceremony logistics, price-stabilisation, investor communication.",
+        startAt: at(1, 11), endAt: at(1, 11, 45), provider: "GOOGLE_MEET", joinUrl: "https://meet.google.com/sample-link", organizerId: rm1.id, clientId: sahyadri.id,
+        mandateId: sahyadriIpoMandate, attendees: [{ email: "suresh@sahyadrirenewables.in", name: "Suresh Patil" }, { email: "anita.d@sahyadrirenewables.in", name: "Anita Deshpande" }],
+      },
+      {
+        title: "DRHP drafting session – business & risk factors", startAt: at(3, 15), endAt: at(3, 16, 30), provider: "TEAMS", joinUrl: "https://teams.microsoft.com/l/meetup-join/sample",
+        organizerId: rm2.id, clientId: kaveri.id, mandateId: mandates["Kaveri Agro Foods Ltd|MAINBOARD_IPO"], attendees: [{ email: "latha.rao@kaveriagro.com", name: "Latha Rao" }],
+      },
+      {
+        title: "Discovery call – IPO readiness", startAt: at(2, 12), endAt: at(2, 12, 30), provider: "PHONE", location: "+91 98200 11223",
+        organizerId: rm1.id, leadId: vardhaman.id, attendees: [{ email: "ankit@vardhamanpolymers.in", name: "Ankit Verma" }],
+      },
+      {
+        title: "Anchor investor roadshow debrief", startAt: daysAgo(6), endAt: new Date(daysAgo(6).getTime() + 3_600_000), provider: "IN_PERSON", location: "BKC, Mumbai",
+        organizerId: rm1.id, clientId: sahyadri.id, status: "COMPLETED", outcome: "Three anchor investors committed; allocation finalised with the BRLM.",
+        attendees: [{ email: "suresh@sahyadrirenewables.in", name: "Suresh Patil" }],
+      },
+    ],
+  });
+
+  // ─── Email conversations (samples, as if captured from Gmail) ─────────
+  const email = (o: { client?: string; lead?: string; user: string; thread: string; subject: string; from: [string, string]; to: string[]; body: string; age: number; out: boolean }) =>
+    prisma.emailMessage.create({
+      data: {
+        provider: "GOOGLE", externalId: `sample-${randomUUID()}`, threadId: o.thread, subject: o.subject, snippet: o.body.slice(0, 140), bodyText: o.body,
+        fromEmail: o.from[0], fromName: o.from[1], toEmails: o.to, ccEmails: [], sentAt: hoursAgo(o.age), direction: o.out ? "OUTBOUND" : "INBOUND",
+        userId: o.user, clientId: o.client, leadId: o.lead,
+      },
+    });
+  await email({ client: sahyadri.id, user: rm1.id, thread: "t-sahyadri-1", subject: "Day 1 subscription status – Sahyadri Renewables IPO", from: ["rohan@beipoready.com", "Rohan Sharma"], to: ["suresh@sahyadrirenewables.in"], body: "Dear Suresh ji,\n\nDay 1 closed at 2.4x overall (QIB 1.1x, NII 3.2x, retail 2.9x). We expect strong retail momentum tomorrow.\n\nRegards,\nRohan", age: 20, out: true });
+  await email({ client: sahyadri.id, user: rm1.id, thread: "t-sahyadri-1", subject: "Re: Day 1 subscription status – Sahyadri Renewables IPO", from: ["suresh@sahyadrirenewables.in", "Suresh Patil"], to: ["rohan@beipoready.com"], body: "Thanks Rohan. Please share category-wise numbers again at 3 pm tomorrow.", age: 18, out: false });
+  await email({ client: kaveri.id, user: rm2.id, thread: "t-kaveri-1", subject: "DRHP chapter drafts for review", from: ["priya@beipoready.com", "Priya Nair"], to: ["latha.rao@kaveriagro.com"], body: "Hi Latha,\n\nAttached are the Business Overview and Risk Factors chapters. Comments by Friday would keep us on track for filing.\n\nPriya", age: 26, out: true });
 
   // ─── Notifications (history) ───────────────────────────────────────────
   await prisma.notification.createMany({

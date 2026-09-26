@@ -2,6 +2,7 @@ import Link from "next/link";
 import { HBarChart } from "@/components/charts";
 import { Card, EmptyState, PageBody, PageHeader } from "@/components/layout";
 import { StageProgress } from "@/components/mandate-list";
+import { MeetingList } from "@/components/meetings-card";
 import { StatTile } from "@/components/stat";
 import { Badge } from "@/components/ui";
 import { getDashboard } from "@/lib/dashboard";
@@ -41,6 +42,12 @@ export default async function DashboardPage() {
             ))}
           </div>
         </Card>
+
+        {can(user.role, "meetings:manage") && (
+          <Card title="My upcoming meetings" actions={<Link href="/meetings" className="text-xs font-medium text-brand-600 hover:underline">All meetings →</Link>}>
+            <MeetingList meetings={d.myMeetings} showRelated />
+          </Card>
+        )}
 
         <div className="grid gap-5 lg:grid-cols-2">
           <Card title="Upcoming target dates">

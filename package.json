@@ -13,7 +13,9 @@
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force",
     "postinstall": "prisma generate",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "start:e2e": "NEXTAUTH_URL=http://localhost:3000 GOOGLE_CLIENT_ID=mock-google GOOGLE_CLIENT_SECRET=mock-google-secret GOOGLE_AUTH_URL=http://localhost:4455/google/auth GOOGLE_TOKEN_URL=http://localhost:4455/google/token GOOGLE_API_URL=http://localhost:4455/google/api GOOGLE_GMAIL_URL=http://localhost:4455/google/gmail MICROSOFT_CLIENT_ID=mock-ms MICROSOFT_CLIENT_SECRET=mock-ms-secret MICROSOFT_LOGIN_URL=http://localhost:4455/ms MICROSOFT_GRAPH_URL=http://localhost:4455/graph next start -p 3000",
+    "mock:providers": "node e2e/mocks/provider-mock.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

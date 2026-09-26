@@ -109,6 +109,10 @@ export async function History({ entities, title = "History" }: { entities: { typ
         return "converted the lead into a client";
       case "mandate_created":
         return `opened mandate ${m.code} — ${m.title}`;
+      case "meeting_scheduled":
+        return `scheduled a meeting: ${m.title}`;
+      case "meeting_cancelled":
+        return `cancelled the meeting "${m.title}"${m.reason ? ` — ${m.reason}` : ""}`;
       case "contact_added":
         return `added contact ${m.name}`;
       case "contact_removed":

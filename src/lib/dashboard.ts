@@ -2,6 +2,7 @@ import { KYC_STATUSES } from "@/lib/kyc";
 import { KYC_STATUS_LABELS, LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS, SERVICE_SHORT_LABELS } from "@/lib/labels";
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICE_LINES } from "@/lib/leads";
 import { BOARD_COLUMNS, CLOSED_STAGES, mandateInclude, mandateScope, WON_STAGES } from "@/lib/mandates";
+import { meetingInclude, toMeetingRow } from "@/lib/meetings";
 import { prisma } from "@/lib/prisma";
 import { ownedScope } from "@/lib/rbac";
 import type { CurrentUser } from "@/lib/session";
@@ -19,7 +20,7 @@ export async function getDashboard(user: CurrentUser) {
   const mScope = mandateScope(user);
   const fyStart = financialYearStart();
 
-  const [totalLeads, totalClients, bySource, byService, byStatus, byRm, byKyc, recentLeads, rms, activeMandates, wonThisFy] = await Promise.all([
+  const [totalLeads, totalClients, bySource, byService, byStatus, byRm, byKyc, recentLeads, rms, activeMandates, wonThisFy, myMeetings] = await Promise.all([
     prisma.lead.count({ where: scope }),
     prisma.client.count({ where: scope }),
     prisma.lead.groupBy({ by: ["source"], where: scope, _count: { _all: true } }),
@@ -40,6 +41,7 @@ export async function getDashboard(user: CurrentUser) {
       orderBy: { targetDate: "asc" },
     }),
     prisma.mandate.findMany({ where: { AND: [mScope, { stage: { in: WON_STAGES }, closedAt: { gte: fyStart } }] }, select: { expectedFee: true } }),
+    prisma.meeting.findMany({ where: { organizerId: user.id, status: "SCHEDULED", endAt: { gte: new Date() } }, include: meetingInclude, orderBy: { startAt: "asc" }, take: 5 }),
   ]);
 
   const count = <K extends string>(rows: ({ _count: { _all: number } } & Record<string, unknown>)[], key: string, value: K) =>
@@ -80,5 +82,6 @@ export async function getDashboard(user: CurrentUser) {
     recentLeads,
     stageColumns,
     upcoming: activeMandates.filter((m) => m.targetDate).slice(0, 6),
+    myMeetings: myMeetings.map((m) => toMeetingRow(m, user)),
   };
 }

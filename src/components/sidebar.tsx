@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { BarChart3, Briefcase, CheckSquare, KanbanSquare, LayoutDashboard, Settings, Rocket, TrendingUp, LogOut, ShieldCheck, Target, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, Briefcase, CalendarDays, CheckSquare, KanbanSquare, LayoutDashboard, Settings, Rocket, TrendingUp, LogOut, ShieldCheck, Target, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -17,6 +17,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
       { href: "/tasks", label: "My tasks", icon: CheckSquare, permission: "tasks:manage" },
+      { href: "/meetings", label: "Meetings", icon: CalendarDays, permission: "meetings:manage" },
       { href: "/leads", label: "Leads", icon: Target, permission: "leads:view" },
       { href: "/clients", label: "Clients", icon: Briefcase, permission: "clients:view" },
       { href: "/mandates", label: "Mandates", icon: KanbanSquare, permission: "mandates:view" },
@@ -99,10 +100,10 @@ export function Sidebar({
               .join("")
               .toUpperCase()}
           </div>
-          <div className="min-w-0 flex-1">
+          <Link href="/account" className="min-w-0 flex-1 rounded hover:bg-gray-50" title="My account & integrations">
             <p className="truncate text-sm font-medium text-gray-900">{user.name}</p>
-            <p className="truncate text-xs text-gray-500">{ROLE_LABELS[user.role]}</p>
-          </div>
+            <p className="truncate text-xs text-gray-500">{ROLE_LABELS[user.role]} · My account</p>
+          </Link>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"

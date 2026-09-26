@@ -47,6 +47,9 @@ export const PERMISSIONS = {
   "tasks:manage": ["ADMIN", "COMPLIANCE", "RM"], // own tasks, on leads/clients they can see
   "tasks:assignOthers": ["ADMIN"],
 
+  "meetings:manage": ["ADMIN", "COMPLIANCE", "RM"], // schedule / complete / cancel on records they can see
+  "emails:send": ["ADMIN", "COMPLIANCE", "RM"],
+
   "dashboard:org": ["ADMIN", "COMPLIANCE", "VIEWER"],
 } as const satisfies Record<string, readonly Role[]>;
 

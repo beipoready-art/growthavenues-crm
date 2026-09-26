@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { ContactsCard } from "@/components/contacts-card";
 import { DetailGrid } from "@/components/detail";
 import { DocumentsPanel } from "@/components/documents-panel";
+import { EmailsCard } from "@/components/emails-card";
+import { MeetingsCard } from "@/components/meetings-card";
 import { History } from "@/components/history";
 import { InteractionLog } from "@/components/interaction-log";
 import { Card, EmptyState, PageBody, PageHeader } from "@/components/layout";
@@ -16,6 +18,7 @@ import { interactionInclude, timelineWhere, toTimelineEntry } from "@/lib/intera
 import { KYC_DOCUMENT_CATEGORIES, KYC_TRANSITIONS, kycDocsEditable } from "@/lib/kyc";
 import { ENTITY_TYPE_LABELS, KYC_STATUS_LABELS, KYC_STATUS_TONE, LEAD_SOURCE_LABELS } from "@/lib/labels";
 import { prisma } from "@/lib/prisma";
+import { loadRecordComms } from "@/lib/record-comms";
 import { can, ownsRecord } from "@/lib/rbac";
 import { requirePageUser } from "@/lib/session";
 import { advisorOptions, listRms } from "@/lib/users";
@@ -43,9 +46,10 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     },
   });
   if (!client || !ownsRecord(user, client)) notFound();
-  const [rms, advisors, interactions] = await Promise.all([
+  const [rms, advisors, comms, interactions] = await Promise.all([
     listRms(),
     advisorOptions(),
+    loadRecordComms(user, { clientId: client.id }),
     prisma.interaction.findMany({
       where: timelineWhere({ clientId: client.id, originLeadId: client.leadId }),
       include: interactionInclude,
@@ -219,6 +223,14 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             />
           </div>
           <div className="space-y-5 xl:col-span-2">
+            <MeetingsCard
+              parent={{ clientId: client.id }}
+              meetings={comms.meetings}
+              contacts={client.contacts.map((c) => ({ name: c.name, email: c.email }))}
+              mandates={client.mandates.map((m) => ({ id: m.id, code: m.code, title: m.title }))}
+              connected={comms.connected}
+              canSchedule={can(user.role, "meetings:manage")}
+            />
             <RecordTasks user={user} target={{ clientId: client.id }} />
             <InteractionLog
               target={{ clientId: client.id }}
@@ -254,6 +266,13 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             <History entities={[{ type: "Client", id: client.id }, ...(client.lead ? [{ type: "Lead", id: client.lead.id }] : [])]} title="Activity (client & lead)" />
           </div>
         </div>
+        <EmailsCard
+          parent={{ clientId: client.id }}
+          emails={comms.emails}
+          recipients={client.contacts.filter((c) => c.email).map((c) => ({ name: c.name, email: c.email! }))}
+          connected={comms.connected}
+          canSend={can(user.role, "emails:send")}
+        />
         <DocumentsPanel
           clientId={client.id}
           canUpload={can(user.role, "docs:upload")}

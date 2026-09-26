@@ -94,7 +94,6 @@ export function DocumentsPanel({
               <Th>Category</Th>
               <Th>Version</Th>
               <Th>Uploaded</Th>
-              <Th>Uploaded by</Th>
               <Th />
             </tr>
           </thead>
@@ -130,8 +129,10 @@ export function DocumentsPanel({
                       v{d.version}
                       {versions.length > 1 && <span className="text-xs text-gray-400"> ({versions.length} versions)</span>}
                     </Td>
-                    <Td>{formatDateTime(d.createdAt)}</Td>
-                    <Td>{d.uploadedBy ?? "—"}</Td>
+                    <Td>
+                      {formatDateTime(d.createdAt)}
+                      <div className="text-xs text-gray-500">{d.uploadedBy ?? "—"}</div>
+                    </Td>
                     <Td className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <DocLinks id={d.id} />
@@ -149,8 +150,9 @@ export function DocumentsPanel({
                         <Td className="pl-10 text-xs">{v.fileName}</Td>
                         <Td />
                         <Td className="text-xs">v{v.version}</Td>
-                        <Td className="text-xs">{formatDateTime(v.createdAt)}</Td>
-                        <Td className="text-xs">{v.uploadedBy ?? "—"}</Td>
+                        <Td className="text-xs">
+                          {formatDateTime(v.createdAt)} · {v.uploadedBy ?? "—"}
+                        </Td>
                         <Td className="text-right">
                           <div className="flex justify-end">
                             <DocLinks id={v.id} />
