@@ -2,7 +2,7 @@
 
 import type { NotificationType } from "@prisma/client";
 import clsx from "clsx";
-import { AlarmClock, CheckSquare, Rocket, ShieldCheck, UserPlus, type LucideIcon } from "lucide-react";
+import { AlarmClock, CalendarClock, CheckSquare, Rocket, ShieldCheck, UserPlus, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
@@ -15,7 +15,8 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   CLIENT_ASSIGNED: UserPlus,
   TASK_ASSIGNED: CheckSquare,
   TASK_DUE: AlarmClock,
-  IPO_CLOSING: Rocket,
+  MANDATE_STAGE: Rocket,
+  MANDATE_DUE: CalendarClock,
 };
 
 type N = { id: string; type: NotificationType; title: string; body: string | null; link: string | null; readAt: string | null; createdAt: string };

@@ -3,7 +3,15 @@ import type { Permission } from "@/lib/rbac";
 
 export const KYC_STATUSES = ["PENDING", "SUBMITTED", "UNDER_REVIEW", "VERIFIED", "REJECTED"] as const satisfies readonly KycStatus[];
 
-export const KYC_DOCUMENT_CATEGORIES = ["KYC_PAN", "KYC_AADHAAR", "KYC_BANK_PROOF", "KYC_PHOTO"] as const satisfies readonly DocumentCategory[];
+/** Company onboarding KYC: all of these are required before KYC can be submitted. */
+export const KYC_DOCUMENT_CATEGORIES = [
+  "KYC_COI",
+  "KYC_PAN",
+  "KYC_GST",
+  "KYC_MOA_AOA",
+  "KYC_BOARD_RESOLUTION",
+  "KYC_PROMOTER_KYC",
+] as const satisfies readonly DocumentCategory[];
 
 /**
  * Allowed KYC transitions and who may perform them.

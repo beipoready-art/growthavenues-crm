@@ -29,7 +29,9 @@ export const PERMISSIONS = {
 
   "ipos:view": ["ADMIN", "COMPLIANCE", "RM", "VIEWER"],
   "ipos:manage": ["ADMIN"],
-  "ipoApps:manage": ["ADMIN", "RM"], // log applications and update allotment (own clients for RMs)
+
+  "mandates:view": ["ADMIN", "COMPLIANCE", "RM", "VIEWER"],
+  "mandates:manage": ["ADMIN", "RM"], // create, edit and move stages (own clients for RMs)
 
   "interactions:log": ["ADMIN", "COMPLIANCE", "RM"], // on leads/clients they can see
   "interactions:amend": ["ADMIN"], // edit or soft-delete, always with a reason
@@ -44,8 +46,6 @@ export const PERMISSIONS = {
 
   "tasks:manage": ["ADMIN", "COMPLIANCE", "RM"], // own tasks, on leads/clients they can see
   "tasks:assignOthers": ["ADMIN"],
-
-  "ipoInterest:manage": ["ADMIN", "RM"],
 
   "dashboard:org": ["ADMIN", "COMPLIANCE", "VIEWER"],
 } as const satisfies Record<string, readonly Role[]>;

@@ -37,7 +37,7 @@ export const taskUpdateSchema = z.object({
 });
 
 export const taskInclude = {
-  lead: { select: { id: true, name: true } },
+  lead: { select: { id: true, companyName: true } },
   client: { select: { id: true, name: true } },
   assignedTo: { select: { id: true, name: true } },
   createdBy: { select: { name: true } },
@@ -88,7 +88,7 @@ export function toTaskRow(t: Row, user: CurrentUser) {
     priority: t.priority,
     status: t.status,
     completedAt: t.completedAt?.toISOString() ?? null,
-    related: t.lead ? { kind: "lead" as const, id: t.lead.id, name: t.lead.name } : t.client ? { kind: "client" as const, id: t.client.id, name: t.client.name } : null,
+    related: t.lead ? { kind: "lead" as const, id: t.lead.id, name: t.lead.companyName } : t.client ? { kind: "client" as const, id: t.client.id, name: t.client.name } : null,
     assignedTo: t.assignedTo,
     createdBy: t.createdBy?.name ?? null,
     canEdit: canTouchTask(user, t),

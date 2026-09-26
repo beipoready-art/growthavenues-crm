@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { Card, EmptyState } from "@/components/layout";
 import { formatDateTime, formatINR } from "@/lib/format";
-import { CLIENT_TYPE_LABELS, DOCUMENT_CATEGORY_LABELS, IPO_APP_STATUS_LABELS, IPO_STATUS_LABELS, KYC_STATUS_LABELS, LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS } from "@/lib/labels";
+import { DOCUMENT_CATEGORY_LABELS, ENTITY_TYPE_LABELS, IPO_STATUS_LABELS, LISTING_BOARD_LABELS, MANDATE_STAGE_LABELS, SERVICE_LABELS, KYC_STATUS_LABELS, LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS } from "@/lib/labels";
 import { prisma } from "@/lib/prisma";
 
 const FIELD_LABELS: Record<string, string> = {
@@ -13,9 +13,33 @@ const FIELD_LABELS: Record<string, string> = {
   notes: "notes",
   assignedRmId: "assigned RM",
   panNumber: "PAN",
-  clientType: "client type",
-  kycStatus: "KYC status",
+  entityType: "entity type",
   companyName: "company",
+  designation: "designation",
+  city: "city",
+  state: "state",
+  sector: "sector",
+  serviceInterest: "service interest",
+  cin: "CIN",
+  gstin: "GSTIN",
+  website: "website",
+  incorporationYear: "incorporation year",
+  financialYear: "financial year",
+  revenueCr: "revenue (₹ Cr)",
+  ebitdaCr: "EBITDA (₹ Cr)",
+  patCr: "PAT (₹ Cr)",
+  netWorthCr: "net worth (₹ Cr)",
+  title: "title",
+  service: "service",
+  board: "board",
+  stage: "stage",
+  issueSizeCr: "issue size (₹ Cr)",
+  retainerFee: "retainer",
+  successFeePct: "success fee %",
+  expectedFee: "expected fee",
+  targetDate: "target date",
+  leadAdvisorId: "lead advisor",
+  kycStatus: "KYC status",
   symbol: "symbol",
   exchange: "exchange",
   priceBandLow: "price band low",
@@ -32,10 +56,12 @@ const FIELD_LABELS: Record<string, string> = {
 const VALUE_LABELS: Record<string, string> = {
   ...LEAD_STATUS_LABELS,
   ...LEAD_SOURCE_LABELS,
-  ...CLIENT_TYPE_LABELS,
+  ...ENTITY_TYPE_LABELS,
+  ...SERVICE_LABELS,
+  ...LISTING_BOARD_LABELS,
+  ...MANDATE_STAGE_LABELS,
   ...KYC_STATUS_LABELS,
   ...IPO_STATUS_LABELS,
-  ...IPO_APP_STATUS_LABELS,
 };
 
 type Change = { from: unknown; to: unknown };
@@ -53,7 +79,7 @@ export async function History({ entities, title = "History" }: { entities: { typ
   const ids = new Set<string>();
   for (const l of logs) {
     const m = l.metadata as Record<string, Change> | null;
-    const c = m?.assignedRmId;
+    const c = m?.assignedRmId ?? m?.leadAdvisorId;
     if (c) [c.from, c.to].forEach((v) => typeof v === "string" && ids.add(v));
     const to = (l.metadata as Record<string, unknown> | null)?.to;
     if (typeof to === "string") ids.add(to);
@@ -63,7 +89,8 @@ export async function History({ entities, title = "History" }: { entities: { typ
 
   const fmt = (field: string, v: unknown) => {
     if (v === null || v === undefined || v === "") return "none";
-    if (field === "assignedRmId") return names[v as string] ?? "unknown user";
+    if (field === "assignedRmId" || field === "leadAdvisorId") return names[v as string] ?? "unknown user";
+    if (field === "retainerFee" || field === "expectedFee") return formatINR(Number(v));
     if (field === "notes") return "…";
     if (field === "amount") return formatINR(Number(v));
     if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T00:00:00.000Z$/.test(v)) return v.slice(0, 10);
@@ -78,18 +105,14 @@ export async function History({ entities, title = "History" }: { entities: { typ
         return `created the ${noun}`;
       case "converted":
         return "converted the lead into a client";
-      case "ipo_applied":
-        return `logged an IPO application: ${m.ipo} · ${m.lots} lot(s) · ${formatINR(Number(m.amount))}`;
-      case "application_logged":
-        return `logged an application for ${m.client} · ${m.lots} lot(s) · ${formatINR(Number(m.amount))}`;
-      case "ipo_application_updated": {
-        const parts = Object.entries(m)
-          .filter(([k]) => k in FIELD_LABELS)
-          .map(([k, c]) => `${FIELD_LABELS[k]} ${fmt(k, (c as Change).from)} → ${fmt(k, (c as Change).to)}`);
-        return `updated ${entityType === "Ipo" ? `${m.client}'s` : `the ${m.ipo}`} application${parts.length ? `: ${parts.join(", ")}` : ""}`;
-      }
-      case "ipo_interest":
-        return `marked the client as interested in ${m.ipo}`;
+      case "mandate_created":
+        return `opened mandate ${m.code} — ${m.title}`;
+      case "contact_added":
+        return `added contact ${m.name}`;
+      case "contact_removed":
+        return `removed contact ${m.name}`;
+      case "contact_updated":
+        return `updated contact ${m.contact}`;
       case "book_reassigned":
         return `reassigned this RM's book (${m.leads} leads, ${m.clients} clients, ${m.tasks} tasks) to ${names[m.to as string] ?? "another RM"}`;
       case "document_uploaded":

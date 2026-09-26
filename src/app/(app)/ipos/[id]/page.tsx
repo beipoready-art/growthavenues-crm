@@ -2,42 +2,27 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DetailGrid } from "@/components/detail";
 import { History } from "@/components/history";
-import { ApplicationsTable } from "@/components/ipo-applications";
 import { EditIpoButton } from "@/components/ipo-form";
-import { InterestToggle } from "@/components/interest-toggle";
-import { StatTile } from "@/components/stat";
-import { Card, EmptyState, PageBody, PageHeader } from "@/components/layout";
+import { Card, PageBody, PageHeader } from "@/components/layout";
+import { MandateList } from "@/components/mandate-list";
 import { Badge } from "@/components/ui";
 import { formatDate, formatINR } from "@/lib/format";
 import { formatPriceBand, serializeIpo } from "@/lib/ipos";
-import { applicationInclude, summarize, toApplicationRow } from "@/lib/ipo-applications";
-import { IPO_APP_STATUS_LABELS, IPO_APP_STATUS_TONE, IPO_STATUS_LABELS, IPO_STATUS_TONE } from "@/lib/labels";
+import { IPO_STATUS_LABELS, IPO_STATUS_TONE } from "@/lib/labels";
+import { canSeeMandate } from "@/lib/mandates";
 import { prisma } from "@/lib/prisma";
-import { can, isScopedToOwn, ownedScope } from "@/lib/rbac";
+import { can } from "@/lib/rbac";
 import { requirePageUser } from "@/lib/session";
 
 export default async function IpoPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requirePageUser("ipos:view");
   const { id } = await params;
-  const ipo = await prisma.ipo.findUnique({ where: { id } });
+  const ipo = await prisma.ipo.findUnique({
+    where: { id },
+    include: { mandate: { include: { client: { select: { id: true, name: true, assignedRmId: true } }, leadAdvisor: { select: { name: true } } } } },
+  });
   if (!ipo) notFound();
-  const scope = ownedScope(user);
-  const [applications, notApplied] = await Promise.all([
-    prisma.ipoApplication.findMany({ where: { ipoId: ipo.id, client: scope }, include: applicationInclude, orderBy: { applicationDate: "desc" } }),
-    // Follow-up list during the subscription window: verified clients who haven't applied yet.
-    ipo.status === "OPEN" || ipo.status === "UPCOMING"
-      ? prisma.client.findMany({
-          where: { ...scope, kycStatus: "VERIFIED", ipoApplications: { none: { ipoId: ipo.id } } },
-          select: { id: true, name: true, phone: true, assignedRm: { select: { name: true } }, ipoInterests: { where: { ipoId: ipo.id }, select: { id: true } } },
-          orderBy: { name: "asc" },
-          take: 50,
-        })
-      : Promise.resolve([]),
-  ]);
-  const summary = summarize(applications);
-  const interestedCount = notApplied.filter((c) => c.ipoInterests.length > 0).length;
-  const canMarkInterest = can(user.role, "ipoInterest:manage");
-  const scoped = isScopedToOwn(user.role);
+  const mandate = ipo.mandate && canSeeMandate(user, ipo.mandate) ? ipo.mandate : null;
 
   return (
     <>
@@ -68,53 +53,18 @@ export default async function IpoPage({ params }: { params: Promise<{ id: string
             </div>
           )}
         </Card>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatTile label={scoped ? "My clients applied" : "Clients applied"} value={summary.applications} />
-          <StatTile label="Lots applied" value={summary.lots.toLocaleString("en-IN")} hint={`${(summary.lots * ipo.lotSize).toLocaleString("en-IN")} shares`} />
-          <StatTile label="Total application amount" value={formatINR(summary.amount)} />
-          <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium text-gray-500">Status breakdown</p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {Object.entries(summary.byStatus)
-                .filter(([, n]) => n > 0)
-                .map(([s, n]) => (
-                  <Badge key={s} tone={IPO_APP_STATUS_TONE[s as keyof typeof IPO_APP_STATUS_TONE]}>
-                    {IPO_APP_STATUS_LABELS[s as keyof typeof IPO_APP_STATUS_LABELS]} · {n}
-                  </Badge>
-                ))}
-              {summary.applications === 0 && <span className="text-sm text-gray-400">No applications</span>}
-            </div>
-          </div>
-        </div>
-        <Card title={scoped ? "My clients' applications" : "Client applications"}>
-          <ApplicationsTable rows={applications.map((a) => toApplicationRow(a, user))} show="client" />
+        <Card title="Our mandate">
+          {mandate ? (
+            <MandateList
+              showClient
+              mandates={[{ ...mandate, expectedFee: mandate.expectedFee == null ? null : Number(mandate.expectedFee), issueSizeCr: mandate.issueSizeCr == null ? null : Number(mandate.issueSizeCr) }]}
+            />
+          ) : (
+            <p className="px-5 py-4 text-sm text-gray-500">
+              {ipo.mandate ? "Linked to a mandate you don't have access to." : "Not one of our mandates — tracked for market reference. Link it from a mandate's page."}
+            </p>
+          )}
         </Card>
-        {(ipo.status === "OPEN" || ipo.status === "UPCOMING") && (
-          <Card
-            title={`Follow up: verified clients not yet applied (${notApplied.length})`}
-            actions={<span className="text-xs text-gray-500">{interestedCount} interested · RMs are alerted 2 days before close</span>}
-          >
-            {notApplied.length === 0 ? (
-              <EmptyState title="Every verified client has applied" />
-            ) : (
-              <ul className="divide-y divide-gray-100" data-testid="not-applied">
-                {notApplied.map((c) => (
-                  <li key={c.id}>
-                    <div className="flex items-center justify-between gap-4 px-5 py-2.5 text-sm hover:bg-gray-50">
-                      <Link href={`/clients/${c.id}`} className="font-medium text-gray-900 hover:text-brand-600">
-                        {c.name}
-                      </Link>
-                      <span className="flex items-center gap-3 text-xs text-gray-500">
-                        {c.phone} · {c.assignedRm?.name ?? "Unassigned"}
-                        <InterestToggle ipoId={ipo.id} clientId={c.id} interested={c.ipoInterests.length > 0} disabled={!canMarkInterest} />
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        )}
         <History entities={[{ type: "Ipo", id: ipo.id }]} />
       </PageBody>
     </>

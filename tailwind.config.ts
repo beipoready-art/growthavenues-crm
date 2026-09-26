@@ -8,12 +8,20 @@ export default {
         sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
       },
       colors: {
+        // Be IPO Ready: deep navy primary with a warm gold accent (from beipoready.com).
         brand: {
-          50: "#eef4ff",
-          100: "#dae6ff",
-          500: "#3b6cf6",
-          600: "#2a55e0",
-          700: "#2243b5",
+          50: "#eef5fa",
+          100: "#d5e5f0",
+          500: "#1f628f",
+          600: "#0f4c75",
+          700: "#0a3a5a",
+        },
+        gold: {
+          50: "#fdf7ea",
+          100: "#faeac5",
+          400: "#f0b54f",
+          500: "#e3a33a",
+          600: "#c4862a",
         },
       },
     },

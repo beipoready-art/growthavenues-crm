@@ -42,7 +42,7 @@ export function LoginForm({ registered }: { registered?: string }) {
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
         <h1 className="text-base font-semibold">Sign in</h1>
-        <p className="text-sm text-gray-500">Welcome back to GrowthAvenues CRM.</p>
+        <p className="text-sm text-gray-500">Welcome back to the Be IPO Ready CRM.</p>
       </div>
       {registered === "pending" && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">

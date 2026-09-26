@@ -23,10 +23,12 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
       leadsConverted: t.leadsConverted + r.leadsConverted,
       cohortConverted: t.cohortConverted + r.cohortConverted,
       clients: t.clients + r.clientsUnderManagement,
-      apps: t.apps + r.ipoApplications,
-      value: t.value + r.applicationValue,
+      signed: t.signed + r.mandatesSigned,
+      won: t.won + r.mandatesWon,
+      fees: t.fees + r.feesWon,
+      pipeline: t.pipeline + r.pipelineFee,
     }),
-    { leadsAssigned: 0, leadsConverted: 0, cohortConverted: 0, clients: 0, apps: 0, value: 0 },
+    { leadsAssigned: 0, leadsConverted: 0, cohortConverted: 0, clients: 0, signed: 0, won: 0, fees: 0, pipeline: 0 },
   );
   const me = rows[0] as RmPerformance | undefined;
 
@@ -42,8 +44,8 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
             <StatTile label="Leads converted" value={me.leadsConverted} hint="Conversions in period" />
             <StatTile label="Conversion rate" value={formatPct(me.conversionRate)} hint={`${me.cohortConverted} of ${me.leadsAssigned} period leads converted`} />
             <StatTile label="Clients under management" value={me.clientsUnderManagement} hint="Current book" />
-            <StatTile label="IPO applications logged" value={me.ipoApplications} />
-            <StatTile label="Total application value" value={formatINR(me.applicationValue)} />
+            <StatTile label="Mandates signed" value={me.mandatesSigned} hint={`${me.mandatesWon} listed / completed`} />
+            <StatTile label="Fees won · live pipeline" value={formatINR(me.feesWon)} hint={`${formatINR(me.pipelineFee)} in active mandates`} />
           </div>
         )}
 
@@ -52,8 +54,8 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <StatTile label="Leads assigned" value={totals.leadsAssigned} hint="All RMs, in period" />
               <StatTile label="Leads converted" value={totals.leadsConverted} />
-              <StatTile label="IPO applications" value={totals.apps} />
-              <StatTile label="Application value" value={formatINR(totals.value)} />
+              <StatTile label="Mandates signed" value={totals.signed} hint={`${totals.won} listed / completed`} />
+              <StatTile label="Fees won" value={formatINR(totals.fees)} hint={`${formatINR(totals.pipeline)} live pipeline`} />
             </div>
 
             {can(user.role, "performance:leaderboard") && <Leaderboard rows={rows} />}
@@ -70,8 +72,10 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
                       <Th className="text-right">Converted</Th>
                       <Th className="text-right">Conversion rate</Th>
                       <Th className="text-right">Clients</Th>
-                      <Th className="text-right">IPO apps</Th>
-                      <Th className="text-right">Application value</Th>
+                      <Th className="text-right">Mandates signed</Th>
+                      <Th className="text-right">Won</Th>
+                      <Th className="text-right">Fees won</Th>
+                      <Th className="text-right">Live pipeline</Th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100" data-testid="rm-table">
@@ -84,8 +88,10 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
                         <Td className="text-right tabular-nums">{r.leadsConverted}</Td>
                         <Td className="text-right tabular-nums">{r.leadsAssigned ? formatPct(r.conversionRate) : "—"}</Td>
                         <Td className="text-right tabular-nums">{r.clientsUnderManagement}</Td>
-                        <Td className="text-right tabular-nums">{r.ipoApplications}</Td>
-                        <Td className="text-right tabular-nums">{formatINR(r.applicationValue)}</Td>
+                        <Td className="text-right tabular-nums">{r.mandatesSigned}</Td>
+                        <Td className="text-right tabular-nums">{r.mandatesWon}</Td>
+                        <Td className="text-right tabular-nums">{formatINR(r.feesWon)}</Td>
+                        <Td className="text-right tabular-nums">{formatINR(r.pipelineFee)}</Td>
                       </tr>
                     ))}
                   </tbody>
@@ -96,15 +102,18 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
                       <Td className="text-right tabular-nums">{totals.leadsConverted}</Td>
                       <Td className="text-right tabular-nums">{totals.leadsAssigned ? formatPct(totals.cohortConverted / totals.leadsAssigned) : "—"}</Td>
                       <Td className="text-right tabular-nums">{totals.clients}</Td>
-                      <Td className="text-right tabular-nums">{totals.apps}</Td>
-                      <Td className="text-right tabular-nums">{formatINR(totals.value)}</Td>
+                      <Td className="text-right tabular-nums">{totals.signed}</Td>
+                      <Td className="text-right tabular-nums">{totals.won}</Td>
+                      <Td className="text-right tabular-nums">{formatINR(totals.fees)}</Td>
+                      <Td className="text-right tabular-nums">{formatINR(totals.pipeline)}</Td>
                     </tr>
                   </tfoot>
                 </Table>
               )}
               <p className="border-t border-gray-100 px-5 py-2.5 text-xs text-gray-500">
                 Leads assigned = new leads created in the period. Converted = conversions that happened in the period. Conversion rate = share of the
-                period&apos;s leads that are now converted. Clients = current book.
+                period&apos;s leads that are now converted. Clients = current book. Mandates and fees are credited to the lead advisor; fees use each
+                mandate&apos;s expected fee (retainer + success fee).
               </p>
             </Card>
           </>
@@ -135,7 +144,7 @@ function Leaderboard({ rows }: { rows: RmPerformance[] }) {
               </span>
               <div className="w-40 shrink-0">
                 <p className="text-sm font-medium text-gray-900">{r.name}</p>
-                <p className="text-xs text-gray-500">{formatINR(r.applicationValue)} IPO value</p>
+                <p className="text-xs text-gray-500">{r.mandatesSigned} mandates signed</p>
               </div>
               <div className="flex flex-1 items-center gap-2">
                 <div className="h-2 flex-1 rounded-full bg-gray-100">

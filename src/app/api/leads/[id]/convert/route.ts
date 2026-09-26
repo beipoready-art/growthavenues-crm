@@ -6,9 +6,10 @@ import { ownsRecord } from "@/lib/rbac";
 import { handle, HttpError, requireApiUser } from "@/lib/session";
 
 /**
- * Converts a lead into a client. The client copies the lead's contact
- * details and links back to it; the lead is kept (status CONVERTED) so its
- * history stays intact.
+ * Converts a company enquiry (lead) into a client company. The client copies
+ * the company details, the enquiry's contact person becomes the primary
+ * contact, and the client links back to the lead, which is kept (status
+ * CONVERTED) so its history stays intact.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {
@@ -25,16 +26,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const now = new Date();
       const created = await tx.client.create({
         data: {
-          name: lead.name,
-          phone: lead.phone,
-          email: lead.email,
+          name: lead.companyName,
+          city: lead.city,
+          sector: lead.sector,
+          revenueCr: lead.revenueCr,
           source: lead.source,
           notes: lead.notes,
           assignedRmId: lead.assignedRmId ?? (user.role === "RM" ? user.id : null),
           leadId: lead.id,
+          entityType: input.entityType,
+          cin: input.cin,
           panNumber: input.panNumber,
-          clientType: input.clientType,
           kycStatus: "PENDING",
+          contacts: {
+            create: [
+              { name: lead.name, designation: lead.designation, email: lead.email, phone: lead.phone, isPrimary: true },
+              // Any extra people captured on the lead come along too.
+              ...(await tx.contact.findMany({ where: { leadId: lead.id } })).map((c) => ({ name: c.name, designation: c.designation, email: c.email, phone: c.phone })),
+            ],
+          },
         },
       });
       await tx.lead.update({ where: { id: lead.id }, data: { status: "CONVERTED", convertedAt: now } });

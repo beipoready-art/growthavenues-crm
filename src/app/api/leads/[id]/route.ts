@@ -52,7 +52,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
         });
       }
       if (changes.assignedRmId && u.assignedRmId) {
-        await notify(tx, [u.assignedRmId], { type: "LEAD_ASSIGNED", title: `Lead assigned to you: ${u.name}`, body: `Reassigned by ${user.name}`, link: `/leads/${u.id}` }, user.id);
+        await notify(tx, [u.assignedRmId], { type: "LEAD_ASSIGNED", title: `Lead assigned to you: ${u.companyName}`, body: `Reassigned by ${user.name}`, link: `/leads/${u.id}` }, user.id);
       }
       return u;
     });
@@ -70,7 +70,7 @@ export async function DELETE(_req: Request, { params }: Ctx) {
     }
     await prisma.$transaction([
       prisma.lead.delete({ where: { id: lead.id } }),
-      prisma.auditLog.create({ data: { entityType: "Lead", entityId: lead.id, action: "deleted", userId: user.id, metadata: { name: lead.name } } }),
+      prisma.auditLog.create({ data: { entityType: "Lead", entityId: lead.id, action: "deleted", userId: user.id, metadata: { name: lead.companyName } } }),
     ]);
     return NextResponse.json({ ok: true });
   });

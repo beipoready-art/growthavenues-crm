@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     const lead = await prisma.$transaction(async (tx) => {
       const created = await tx.lead.create({ data: { ...input, assignedRmId, createdById: user.id } });
       await audit(tx, { entityType: "Lead", entityId: created.id, action: "created", userId: user.id });
-      await notify(tx, [assignedRmId], { type: "LEAD_ASSIGNED", title: `New lead assigned: ${created.name}`, body: `Assigned by ${user.name}`, link: `/leads/${created.id}` }, user.id);
+      await notify(tx, [assignedRmId], { type: "LEAD_ASSIGNED", title: `New lead assigned: ${created.companyName}`, body: `Assigned by ${user.name}`, link: `/leads/${created.id}` }, user.id);
       return created;
     });
     return NextResponse.json({ lead }, { status: 201 });

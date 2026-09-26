@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     const range = resolveRange(new URL(req.url).searchParams);
     const rows = await getRmPerformance(range.from, range.to, all ? undefined : [user.id]);
     const csv = toCsv(
-      ["RM", "Active", "Period from", "Period to", "Leads assigned", "Leads converted", "Conversion rate %", "Clients under management", "IPO applications", "Application value (INR)"],
+      ["RM", "Active", "Period from", "Period to", "Leads assigned", "Leads converted", "Conversion rate %", "Clients under management", "Mandates signed", "Mandates won", "Fees won (INR)", "Live pipeline fee (INR)"],
       rows.map((r) => [
         r.name,
         r.active ? "Yes" : "No",
@@ -23,8 +23,10 @@ export async function GET(req: Request) {
         r.leadsConverted,
         (r.conversionRate * 100).toFixed(1),
         r.clientsUnderManagement,
-        r.ipoApplications,
-        r.applicationValue.toFixed(2),
+        r.mandatesSigned,
+        r.mandatesWon,
+        r.feesWon.toFixed(0),
+        r.pipelineFee.toFixed(0),
       ]),
     );
     return csvResponse("rm-performance", csv);

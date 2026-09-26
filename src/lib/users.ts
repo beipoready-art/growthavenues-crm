@@ -18,3 +18,13 @@ export function listRms() {
     orderBy: { name: "asc" },
   });
 }
+
+/** Active users who can lead a mandate (RMs and Admins), as select options. */
+export async function advisorOptions() {
+  const users = await prisma.user.findMany({
+    where: { active: true, role: { in: ["RM", "ADMIN"] } },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+  return users.map((u) => ({ value: u.id, label: u.name }));
+}

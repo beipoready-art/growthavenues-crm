@@ -43,21 +43,22 @@ export function trailingMonths(months: number, now = new Date()) {
 
 const monthLabel = (key: string) => new Intl.DateTimeFormat("en-IN", { month: "short", year: "2-digit", timeZone: "UTC" }).format(new Date(key + "-01T00:00:00Z"));
 
-/** Monthly pipeline: IPO application value, new leads and conversions (RM-scoped). */
+/** Monthly pipeline: mandates signed (and their expected fees), new leads and conversions (RM-scoped). */
 export async function pipelineByMonth(user: CurrentUser, months = 6) {
   const keys = trailingMonths(months);
   const [y, m] = keys[0].split("-").map(Number);
   const since = zonedMidnight(y, m, 1);
   // Timestamps are stored in UTC; bucket them by month in the app timezone.
   const tz = APP_TIMEZONE;
-  const rmFilter = user.role === "RM" ? Prisma.sql`AND c."assignedRmId" = ${user.id}` : Prisma.empty;
+  const rmFilter = user.role === "RM" ? Prisma.sql`AND (c."assignedRmId" = ${user.id} OR m."leadAdvisorId" = ${user.id})` : Prisma.empty;
   const leadRm = user.role === "RM" ? Prisma.sql`AND "assignedRmId" = ${user.id}` : Prisma.empty;
 
   const [value, created, converted] = await Promise.all([
-    prisma.$queryRaw<{ month: string; total: Prisma.Decimal; n: bigint }[]>`
-      SELECT to_char(date_trunc('month', a."applicationDate"), 'YYYY-MM') AS month, SUM(a.amount) AS total, COUNT(*) AS n
-      FROM "IpoApplication" a JOIN "Client" c ON c.id = a."clientId"
-      WHERE a."applicationDate" >= ${keys[0] + "-01"}::date ${rmFilter}
+    prisma.$queryRaw<{ month: string; total: Prisma.Decimal | null; n: bigint }[]>`
+      SELECT to_char(date_trunc('month', (m."signedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}), 'YYYY-MM') AS month,
+             SUM(m."expectedFee") AS total, COUNT(*) AS n
+      FROM "Mandate" m JOIN "Client" c ON c.id = m."clientId"
+      WHERE m."signedAt" >= ${since} ${rmFilter}
       GROUP BY 1`,
     prisma.$queryRaw<{ month: string; n: bigint }[]>`
       SELECT to_char(date_trunc('month', ("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}), 'YYYY-MM') AS month, COUNT(*) AS n
@@ -70,8 +71,8 @@ export async function pipelineByMonth(user: CurrentUser, months = 6) {
   return keys.map((k) => ({
     month: k,
     label: monthLabel(k),
-    applicationValue: Number(get(value, k)?.total ?? 0),
-    applications: Number(get(value, k)?.n ?? 0),
+    feeSigned: Number(get(value, k)?.total ?? 0),
+    mandatesSigned: Number(get(value, k)?.n ?? 0),
     newLeads: Number(get(created, k)?.n ?? 0),
     conversions: Number(get(converted, k)?.n ?? 0),
   }));

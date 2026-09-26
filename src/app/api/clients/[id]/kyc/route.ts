@@ -26,13 +26,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (t.requiresNote && !note) throw new HttpError(400, "A reason is required");
 
     if (toStatus === "SUBMITTED") {
-      if (!client.panNumber) throw new HttpError(400, "Add the client's PAN number before submitting KYC");
+      if (!client.panNumber) throw new HttpError(400, "Add the company PAN before submitting KYC");
       const present = await prisma.document.findMany({
         where: { clientId: client.id, category: { in: [...KYC_DOCUMENT_CATEGORIES] } },
         select: { category: true },
         distinct: ["category"],
       });
-      if (present.length < KYC_DOCUMENT_CATEGORIES.length) throw new HttpError(400, "Upload all four KYC documents before submitting");
+      if (present.length < KYC_DOCUMENT_CATEGORIES.length) throw new HttpError(400, `Upload all ${KYC_DOCUMENT_CATEGORIES.length} onboarding documents before submitting`);
     }
 
     const [updated, change] = await prisma.$transaction(async (tx) => {

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui";
 import { clientListInclude } from "@/lib/clients";
 import type { SearchParams } from "@/lib/filters";
 import { formatDate } from "@/lib/format";
-import { CLIENT_TYPE_LABELS, KYC_STATUS_LABELS, KYC_STATUS_TONE } from "@/lib/labels";
+import { ENTITY_TYPE_LABELS, KYC_STATUS_LABELS, KYC_STATUS_TONE } from "@/lib/labels";
 
 type ClientRow = Prisma.ClientGetPayload<{ include: typeof clientListInclude }>;
 
@@ -31,11 +31,11 @@ export function ClientsTable({
         <Table>
           <thead>
             <tr>
-              <Th>Name</Th>
-              <Th>Phone</Th>
-              <Th>Email</Th>
-              <Th>PAN</Th>
-              <Th>Type</Th>
+              <Th>Company</Th>
+              <Th>Sector</Th>
+              <Th>City</Th>
+              <Th>Entity</Th>
+              <Th className="text-right">Mandates</Th>
               <Th>KYC</Th>
               <Th>Assigned RM</Th>
               <Th>Client since</Th>
@@ -48,11 +48,17 @@ export function ClientsTable({
                   <Link href={`/clients/${c.id}`} className="font-medium text-gray-900 hover:text-brand-600">
                     {c.name}
                   </Link>
+                  {c.contacts[0] && (
+                    <div className="text-xs text-gray-500">
+                      {c.contacts[0].name}
+                      {c.contacts[0].designation && `, ${c.contacts[0].designation}`}
+                    </div>
+                  )}
                 </Td>
-                <Td>{c.phone}</Td>
-                <Td className="text-gray-500">{c.email ?? "—"}</Td>
-                <Td className="font-mono text-xs">{c.panNumber ?? "—"}</Td>
-                <Td>{CLIENT_TYPE_LABELS[c.clientType]}</Td>
+                <Td>{c.sector ?? "—"}</Td>
+                <Td>{c.city ?? "—"}</Td>
+                <Td>{ENTITY_TYPE_LABELS[c.entityType]}</Td>
+                <Td className="text-right tabular-nums">{c._count.mandates}</Td>
                 <Td>
                   <Badge tone={KYC_STATUS_TONE[c.kycStatus]}>{KYC_STATUS_LABELS[c.kycStatus]}</Badge>
                 </Td>

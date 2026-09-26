@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { audit } from "@/lib/audit";
 import { loadClientForUser } from "@/lib/clients";
-import { createDocumentVersion } from "@/lib/documents";
+import { createDocumentVersion, GENERAL_DOCUMENT_CATEGORIES } from "@/lib/documents";
 import { KYC_DOCUMENT_CATEGORIES, kycDocsEditable } from "@/lib/kyc";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/rbac";
@@ -26,7 +26,8 @@ export async function GET(req: Request, { params }: Ctx) {
 }
 
 const formSchema = z.object({
-  category: z.enum(["KYC_PAN", "KYC_AADHAAR", "KYC_BANK_PROOF", "KYC_PHOTO", "CONTRACT_NOTE", "RISK_DISCLOSURE", "APPLICATION_FORM", "OTHER"]),
+  category: z.enum([...KYC_DOCUMENT_CATEGORIES, ...GENERAL_DOCUMENT_CATEGORIES]),
+  mandateId: z.string().optional().transform((v) => v || null),
   title: z.string().trim().max(200).optional().transform((v) => v || null),
   notes: z.string().trim().max(1000).optional().transform((v) => v || null),
   // Upload as a new version of this document group (general documents).
@@ -49,14 +50,18 @@ export async function POST(req: Request, { params }: Ctx) {
       title: form.get("title") ?? undefined,
       notes: form.get("notes") ?? undefined,
       replacesGroupId: form.get("replacesGroupId") ?? undefined,
+      mandateId: form.get("mandateId") ?? undefined,
     });
+    if (input.mandateId && !(await prisma.mandate.findFirst({ where: { id: input.mandateId, clientId: client.id } }))) {
+      throw new HttpError(400, "That mandate belongs to another client");
+    }
     const file = form.get("file");
 
     const isKyc = (KYC_DOCUMENT_CATEGORIES as readonly string[]).includes(input.category);
     if (!can(user.role, isKyc ? "kyc:upload" : "docs:upload")) throw new HttpError(403, "You do not have permission to upload documents");
     if (!(file instanceof File) || file.size === 0) throw new HttpError(400, "Choose a file to upload");
-    if (file.size > MAX_UPLOAD_BYTES) throw new HttpError(400, "File is larger than 10 MB");
-    if (!ALLOWED_MIME_TYPES[file.type]) throw new HttpError(400, "Only PDF, JPG, PNG or WEBP files are allowed");
+    if (file.size > MAX_UPLOAD_BYTES) throw new HttpError(400, "File is larger than 25 MB");
+    if (!ALLOWED_MIME_TYPES[file.type]) throw new HttpError(400, "Only PDF, Word, Excel, PowerPoint or image (JPG/PNG/WEBP) files are allowed");
     if (isKyc && !kycDocsEditable(client.kycStatus)) throw new HttpError(400, "KYC documents are locked while KYC is submitted, under review or verified");
 
     let groupId = input.replacesGroupId;
@@ -83,6 +88,7 @@ export async function POST(req: Request, { params }: Ctx) {
           mimeType: file.type,
           sizeBytes: file.size,
           notes: input.notes,
+          mandateId: input.mandateId,
           uploadedById: user.id,
         },
         groupId,

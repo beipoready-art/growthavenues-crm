@@ -2,11 +2,11 @@ import { expect, type Browser, type Page } from "@playwright/test";
 
 export const PASSWORD = "Password@123";
 export const USERS = {
-  admin: "admin@growthavenues.in",
-  compliance: "compliance@growthavenues.in",
-  rm1: "rohan@growthavenues.in", // Rohan Sharma
-  rm2: "priya@growthavenues.in", // Priya Nair
-  viewer: "viewer@growthavenues.in",
+  admin: "admin@beipoready.com",
+  compliance: "compliance@beipoready.com",
+  rm1: "rohan@beipoready.com", // Rohan Sharma
+  rm2: "priya@beipoready.com", // Priya Nair
+  viewer: "viewer@beipoready.com",
 } as const;
 
 export async function login(page: Page, email: string) {

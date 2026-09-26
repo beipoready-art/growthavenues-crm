@@ -17,12 +17,12 @@ npm run dev                     # http://localhost:3000
 
 | Role                 | Email                         |
 | -------------------- | ----------------------------- |
-| Admin                | admin@growthavenues.in        |
-| Compliance Officer   | compliance@growthavenues.in   |
-| Relationship Manager | rohan@growthavenues.in        |
-| Relationship Manager | priya@growthavenues.in        |
-| Viewer               | viewer@growthavenues.in       |
-| Viewer (inactive)    | neha@growthavenues.in         |
+| Admin                | admin@beipoready.com        |
+| Compliance Officer   | compliance@beipoready.com   |
+| Relationship Manager | rohan@beipoready.com        |
+| Relationship Manager | priya@beipoready.com        |
+| Viewer               | viewer@beipoready.com       |
+| Viewer (inactive)    | neha@beipoready.com         |
 
 `npm run db:seed` resets all data, so re-run it any time to get back to a clean demo state.
 

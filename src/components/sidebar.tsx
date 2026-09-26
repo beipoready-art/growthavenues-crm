@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { BarChart3, Briefcase, CheckSquare, LayoutDashboard, Settings, Rocket, TrendingUp, LogOut, ShieldCheck, Target, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, Briefcase, CheckSquare, KanbanSquare, LayoutDashboard, Settings, Rocket, TrendingUp, LogOut, ShieldCheck, Target, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -19,8 +19,9 @@ const NAV: { section?: string; items: NavItem[] }[] = [
       { href: "/tasks", label: "My tasks", icon: CheckSquare, permission: "tasks:manage" },
       { href: "/leads", label: "Leads", icon: Target, permission: "leads:view" },
       { href: "/clients", label: "Clients", icon: Briefcase, permission: "clients:view" },
+      { href: "/mandates", label: "Mandates", icon: KanbanSquare, permission: "mandates:view" },
       { href: "/kyc", label: "KYC queue", icon: ShieldCheck, permission: "clients:view" },
-      { href: "/ipos", label: "IPOs", icon: Rocket, permission: "ipos:view" },
+      { href: "/ipos", label: "IPO issues", icon: Rocket, permission: "ipos:view" },
     ],
   },
   {

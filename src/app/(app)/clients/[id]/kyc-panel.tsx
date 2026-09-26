@@ -65,7 +65,7 @@ export function KycPanel({
   const stepIndex = status === "REJECTED" ? 2 : STEPS.indexOf(status);
 
   return (
-    <Card title="KYC" actions={<Badge tone={KYC_STATUS_TONE[status]}>{KYC_STATUS_LABELS[status]}</Badge>}>
+    <Card title="Onboarding KYC" actions={<Badge tone={KYC_STATUS_TONE[status]}>{KYC_STATUS_LABELS[status]}</Badge>}>
       {/* Progress */}
       <ol className="flex items-center gap-2 border-b border-gray-100 px-5 py-3 text-xs">
         {STEPS.map((s, i) => {

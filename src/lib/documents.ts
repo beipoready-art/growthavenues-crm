@@ -2,7 +2,19 @@ import type { DocumentCategory, Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { HttpError } from "@/lib/session";
 
-export const GENERAL_DOCUMENT_CATEGORIES = ["CONTRACT_NOTE", "RISK_DISCLOSURE", "APPLICATION_FORM", "OTHER"] as const satisfies readonly DocumentCategory[];
+export const GENERAL_DOCUMENT_CATEGORIES = [
+  "NDA",
+  "PROPOSAL",
+  "ENGAGEMENT_LETTER",
+  "FINANCIALS",
+  "ITR",
+  "DUE_DILIGENCE",
+  "VALUATION_REPORT",
+  "PITCH_DECK",
+  "DRHP",
+  "RHP",
+  "OTHER",
+] as const satisfies readonly DocumentCategory[];
 
 type NewVersion = {
   clientId: string;
@@ -13,6 +25,7 @@ type NewVersion = {
   mimeType: string;
   sizeBytes: number;
   notes: string | null;
+  mandateId?: string | null;
   uploadedById: string;
 };
 

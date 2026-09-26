@@ -18,7 +18,7 @@ export type CompanyProfileView = {
 export const getCompanyProfile = cache(async (): Promise<CompanyProfileView> => {
   const p = await prisma.companyProfile.findUnique({ where: { id: 1 } });
   return {
-    firmName: p?.firmName ?? "GrowthAvenues",
+    firmName: p?.firmName ?? "Be IPO Ready",
     tagline: p?.tagline ?? null,
     email: p?.email ?? null,
     phone: p?.phone ?? null,

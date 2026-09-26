@@ -14,11 +14,13 @@ import { requirePageUser } from "@/lib/session";
 export default async function IposPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await requirePageUser("ipos:view");
   const sp = await searchParams;
-  const ipos = (await prisma.ipo.findMany({ where: ipoWhere(sp), orderBy: ipoOrder })).sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status]);
+  const ipos = (
+    await prisma.ipo.findMany({ where: ipoWhere(sp), orderBy: ipoOrder, include: { mandate: { select: { id: true, code: true, client: { select: { name: true } } } } } })
+  ).sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status]);
 
   return (
     <>
-      <PageHeader title="IPOs" description="Master list of IPOs we advise on" actions={can(user.role, "ipos:manage") && <NewIpoButton />} />
+      <PageHeader title="IPO issues" description="Issues of our mandates, plus other IPOs we track for market reference" actions={can(user.role, "ipos:manage") && <NewIpoButton />} />
       <PageBody className="space-y-4">
         <FilterBar searchPlaceholder="Search company or symbol…" filters={[{ type: "select", key: "status", label: "Statuses", options: options(IPO_STATUS_LABELS) }]} />
         <Card>
@@ -35,6 +37,7 @@ export default async function IposPage({ searchParams }: { searchParams: Promise
                   <Th>Open – Close</Th>
                   <Th>Listing</Th>
                   <Th>Status</Th>
+                  <Th>Our mandate</Th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -55,6 +58,15 @@ export default async function IposPage({ searchParams }: { searchParams: Promise
                     <Td>{formatDate(i.listingDate)}</Td>
                     <Td>
                       <Badge tone={IPO_STATUS_TONE[i.status]}>{IPO_STATUS_LABELS[i.status]}</Badge>
+                    </Td>
+                    <Td>
+                      {i.mandate ? (
+                        <Link href={`/mandates/${i.mandate.id}`} className="text-brand-600 hover:underline">
+                          {i.mandate.code}
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-gray-400">Market tracker</span>
+                      )}
                     </Td>
                   </tr>
                 ))}

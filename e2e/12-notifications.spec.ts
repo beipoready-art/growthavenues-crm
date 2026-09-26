@@ -4,23 +4,23 @@ import { as } from "./helpers";
 type N = { id: string; type: string; title: string; readAt: string | null };
 const list = async (page: Page) => (await (await page.request.get("/api/notifications?limit=100")).json()) as { notifications: N[]; unread: number };
 
-test("generated reminders: task due/overdue and IPO closing soon, without duplicates", async ({ browser }) => {
+test("generated reminders: task due/overdue and mandate target approaching, without duplicates", async ({ browser }) => {
   const rm = await as(browser, "rm1");
   await rm.goto("/"); // page load syncs reminders
   let { notifications } = await list(rm);
-  expect(notifications.some((n) => n.type === "TASK_DUE" && n.title.startsWith("Overdue: Send KYC checklist"))).toBe(true);
-  expect(notifications.some((n) => n.type === "TASK_DUE" && n.title.startsWith("Due today: Remind Suresh"))).toBe(true);
-  const closing = notifications.find((n) => n.type === "IPO_CLOSING")!;
-  expect(closing.title).toContain("Sahyadri Renewables Ltd closes");
+  expect(notifications.some((n) => n.type === "TASK_DUE" && n.title.startsWith("Overdue: Send IPO readiness checklist"))).toBe(true);
+  expect(notifications.some((n) => n.type === "TASK_DUE" && n.title.startsWith("Due today: Share day-2 subscription"))).toBe(true);
+  const due = notifications.find((n) => n.type === "MANDATE_DUE")!;
+  expect(due.title).toMatch(/^BIR-\d{4}-\d{3} target approaching/);
   const before = notifications.length;
   await rm.goto("/leads");
   await rm.goto("/");
   ({ notifications } = await list(rm));
   expect(notifications.length).toBe(before);
 
-  // Priya has no interested clients on the closing IPO → no IPO alert.
+  // Priya leads no mandate with a target date within 7 days.
   const rm2 = await as(browser, "rm2");
-  expect((await list(rm2)).notifications.some((n) => n.type === "IPO_CLOSING")).toBe(false);
+  expect((await list(rm2)).notifications.some((n) => n.type === "MANDATE_DUE")).toBe(false);
 });
 
 test("KYC changes notify compliance on submit and the RM on review, never the actor", async ({ browser }) => {
@@ -42,12 +42,12 @@ test("KYC changes notify compliance on submit and the RM on review, never the ac
 
 test("lead assignment notifies the new RM", async ({ browser }) => {
   const admin = await as(browser, "admin");
-  const farhan = (await (await admin.request.get("/api/leads?q=Farhan")).json()).leads[0];
+  const farhan = (await (await admin.request.get("/api/leads?q=Farhan")).json()).leads[0]; // Qureshi Cold Chain
   const users = (await (await admin.request.get("/api/users")).json()).users as { id: string; email: string }[];
-  const priya = users.find((u) => u.email === "priya@growthavenues.in")!;
+  const priya = users.find((u) => u.email === "priya@beipoready.com")!;
   await admin.request.patch(`/api/leads/${farhan.id}`, { data: { assignedRmId: priya.id } });
   const rm2 = await as(browser, "rm2");
-  expect((await list(rm2)).notifications[0].title).toBe("Lead assigned to you: Farhan Qureshi");
+  expect((await list(rm2)).notifications[0].title).toBe("Lead assigned to you: Qureshi Cold Chain Pvt Ltd");
 });
 
 test("notification center: bell badge, open marks read, mark unread, mark all read", async ({ browser }) => {
@@ -58,12 +58,12 @@ test("notification center: bell badge, open marks read, mark unread, mark all re
 
   await rm.getByRole("button", { name: /Notifications/ }).click();
   const menu = rm.getByTestId("notification-menu");
-  await menu.getByText(/Sahyadri Renewables Ltd closes/).click();
-  await expect(rm).toHaveURL(/\/ipos\//);
+  await menu.getByText(/target approaching/).click();
+  await expect(rm).toHaveURL(/\/mandates\//);
   await expect(rm.getByTestId("unread-badge")).toHaveText(String(unread - 1));
 
   await rm.goto("/notifications");
-  const row = rm.getByTestId("notification").filter({ hasText: "Sahyadri Renewables Ltd closes" });
+  const row = rm.getByTestId("notification").filter({ hasText: "target approaching" });
   await expect(row).toHaveAttribute("data-read", "true");
   await row.getByRole("button", { name: "Mark unread" }).click();
   await expect(row).toHaveAttribute("data-read", "false");
@@ -80,14 +80,7 @@ test("notification center: bell badge, open marks read, mark unread, mark all re
   expect((await rm2.request.patch(`/api/notifications/${mine.id}`, { data: { read: false } })).status()).toBe(404);
 });
 
-test("RM marks client interest on the IPO page; cron endpoint requires the secret", async ({ browser }) => {
+test("cron endpoint requires the secret", async ({ browser }) => {
   const rm = await as(browser, "rm2");
-  const kaveri = (await (await rm.request.get("/api/ipos?q=Kaveri")).json()).ipos[0];
-  await rm.goto(`/ipos/${kaveri.id}`);
-  const row = rm.getByTestId("not-applied").locator("div").filter({ hasText: "Arjun Kapoor" }).first();
-  await row.getByRole("button", { name: "Mark interested" }).click();
-  await expect(row.getByRole("button", { name: "Interested" })).toBeVisible();
-
-  const res = await rm.request.post("/api/cron/notifications");
-  expect(res.status()).toBe(401);
+  expect((await rm.request.post("/api/cron/notifications")).status()).toBe(401);
 });

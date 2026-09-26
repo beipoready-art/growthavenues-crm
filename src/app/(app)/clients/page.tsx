@@ -3,7 +3,7 @@ import { FilterBar } from "@/components/filter-bar";
 import { PageBody, PageHeader } from "@/components/layout";
 import { clientListInclude, clientWhere } from "@/lib/clients";
 import { PAGE_SIZE, pageParam, type SearchParams } from "@/lib/filters";
-import { CLIENT_TYPE_LABELS, KYC_STATUS_LABELS, options } from "@/lib/labels";
+import { ENTITY_TYPE_LABELS, KYC_STATUS_LABELS, options } from "@/lib/labels";
 import { prisma } from "@/lib/prisma";
 import { isScopedToOwn } from "@/lib/rbac";
 import { requirePageUser } from "@/lib/session";
@@ -25,7 +25,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
     <>
       <PageHeader
         title="Clients"
-        description={scoped ? "Clients assigned to you" : "All clients"}
+        description={scoped ? "Client companies assigned to you" : "Companies we advise"}
         actions={
           <a
             href={`/api/reports/clients?${new URLSearchParams(Object.entries(sp).filter((e): e is [string, string] => typeof e[1] === "string")).toString()}`}
@@ -37,10 +37,10 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
       />
       <PageBody className="space-y-4">
         <FilterBar
-          searchPlaceholder="Search name, phone, email, PAN…"
+          searchPlaceholder="Search company, contact, sector, CIN, PAN…"
           filters={[
             { type: "select", key: "kyc", label: "KYC statuses", options: options(KYC_STATUS_LABELS) },
-            { type: "select", key: "type", label: "Types", options: options(CLIENT_TYPE_LABELS) },
+            { type: "select", key: "type", label: "Entity types", options: options(ENTITY_TYPE_LABELS) },
             ...(scoped
               ? []
               : [{ type: "select" as const, key: "rm", label: "RMs", allLabel: "All RMs", options: [{ value: "unassigned", label: "Unassigned" }, ...rms.map((r) => ({ value: r.id, label: r.name }))] }]),

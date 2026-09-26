@@ -41,13 +41,17 @@ const localDriver: StorageDriver = {
 
 export const storage: StorageDriver = localDriver;
 
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // DRHP drafts and financial models can be large
 export const ALLOWED_MIME_TYPES: Record<string, string> = {
   "application/pdf": "pdf",
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
 };
+export const UPLOAD_ACCEPT = Object.keys(ALLOWED_MIME_TYPES).join(",");
 
 /** Builds a unique, non-guessable key; the original filename is kept only in the DB. */
 export function makeStorageKey(prefix: string, mimeType: string) {

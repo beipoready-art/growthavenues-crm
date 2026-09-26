@@ -10,13 +10,21 @@ export function audit(
   return db.auditLog.create({ data: entry });
 }
 
+/** Normalises values for comparison/storage: Dates → ISO strings, Prisma Decimals → numbers. */
+function norm(v: unknown) {
+  if (v instanceof Date) return v.toISOString();
+  if (v && typeof v === "object" && "toFixed" in v && typeof (v as { toString(): string }).toString === "function") return Number(String(v));
+  return v;
+}
+
 /** Builds a { field: { from, to } } diff of changed fields, for audit metadata. */
-export function diff<T extends Record<string, unknown>>(before: T, patch: Partial<T>) {
+export function diff(before: object, patch: object) {
+  const b = before as Record<string, unknown>;
   const changes: Record<string, { from: unknown; to: unknown }> = {};
-  for (const key of Object.keys(patch) as (keyof T)[]) {
-    const from = before[key] instanceof Date ? (before[key] as Date).toISOString() : before[key];
-    const to = patch[key] instanceof Date ? (patch[key] as Date).toISOString() : patch[key];
-    if (to !== undefined && from !== to) changes[key as string] = { from: from ?? null, to: to ?? null };
+  for (const [key, value] of Object.entries(patch)) {
+    const from = norm(b[key]);
+    const to = norm(value);
+    if (to !== undefined && from !== to) changes[key] = { from: from ?? null, to: to ?? null };
   }
   return changes;
 }

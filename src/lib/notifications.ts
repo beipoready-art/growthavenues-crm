@@ -25,14 +25,13 @@ export async function complianceOfficerIds(db: Db = prisma) {
   return users.map((u) => u.id);
 }
 
-/** Days before close when "IPO closing soon" alerts start. */
-export const IPO_CLOSING_WINDOW_DAYS = 2;
+/** Days before a mandate's target date when "target date approaching" reminders start. */
+export const MANDATE_DUE_WINDOW_DAYS = 7;
 
 /**
  * Creates time-based reminders for one user (idempotent via dedupe keys):
  * - tasks assigned to them that are due today or overdue
- * - open IPOs closing within IPO_CLOSING_WINDOW_DAYS where their clients
- *   showed interest but haven't applied
+ * - active mandates they lead whose target date is within MANDATE_DUE_WINDOW_DAYS
  * Runs on page load for the signed-in user; `syncAllNotifications` can be
  * called from a scheduled job to cover users who aren't signed in.
  */
@@ -55,34 +54,25 @@ export async function syncNotificationsForUser(userId: string, now = new Date())
     };
   });
 
-  const closingBy = new Date(endToday.getTime() + IPO_CLOSING_WINDOW_DAYS * 86_400_000);
-  const interests = await prisma.ipoInterest.findMany({
-    where: {
-      client: { assignedRmId: userId },
-      ipo: { status: "OPEN", closeDate: { gte: new Date(zonedDateString(now) + "T00:00:00Z"), lte: closingBy } },
-    },
-    select: {
-      ipo: { select: { id: true, companyName: true, closeDate: true, applications: { select: { clientId: true } } } },
-      client: { select: { id: true, name: true } },
-    },
+  const today = new Date(zonedDateString(now) + "T00:00:00Z");
+  const horizon = new Date(today.getTime() + MANDATE_DUE_WINDOW_DAYS * 86_400_000);
+  const mandates = await prisma.mandate.findMany({
+    where: { leadAdvisorId: userId, targetDate: { lte: horizon }, stage: { notIn: ["LISTED", "COMPLETED", "DROPPED", "ON_HOLD"] } },
+    select: { id: true, code: true, title: true, targetDate: true, client: { select: { name: true } } },
   });
-  const byIpo = new Map<string, { ipo: (typeof interests)[number]["ipo"]; clients: string[] }>();
-  for (const i of interests) {
-    if (i.ipo.applications.some((a) => a.clientId === i.client.id)) continue;
-    const entry = byIpo.get(i.ipo.id) ?? { ipo: i.ipo, clients: [] };
-    entry.clients.push(i.client.name);
-    byIpo.set(i.ipo.id, entry);
-  }
-  const ipoNotes = [...byIpo.values()].map(({ ipo, clients }) => ({
-    userId,
-    type: "IPO_CLOSING" as const,
-    dedupeKey: `ipo-closing:${ipo.id}`,
-    title: `${ipo.companyName} closes ${formatDate(ipo.closeDate)}`,
-    body: `${clients.length} interested client${clients.length > 1 ? "s haven't" : " hasn't"} applied: ${clients.join(", ")}`,
-    link: `/ipos/${ipo.id}`,
-  }));
+  const mandateNotes = mandates.map((m) => {
+    const overdue = m.targetDate! < today;
+    return {
+      userId,
+      type: "MANDATE_DUE" as const,
+      dedupeKey: `mandate-${overdue ? "overdue" : "due"}:${m.id}:${m.targetDate!.toISOString().slice(0, 10)}`,
+      title: `${m.code} target ${overdue ? "passed" : "approaching"}: ${formatDate(m.targetDate)}`,
+      body: `${m.client.name} · ${m.title}`,
+      link: `/mandates/${m.id}`,
+    };
+  });
 
-  const data = [...taskNotes, ...ipoNotes];
+  const data = [...taskNotes, ...mandateNotes];
   if (data.length) await prisma.notification.createMany({ data, skipDuplicates: true });
 }
 

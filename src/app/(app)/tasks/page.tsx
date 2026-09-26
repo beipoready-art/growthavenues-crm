@@ -12,7 +12,7 @@ export default async function MyTasksPage() {
   const [open, done, leads, clients, assignees] = await Promise.all([
     prisma.task.findMany({ where: { assignedToId: user.id, status: "OPEN" }, include: taskInclude, orderBy: { dueAt: "asc" } }),
     prisma.task.findMany({ where: { assignedToId: user.id, status: "DONE", completedAt: { gte: twoWeeksAgo } }, include: taskInclude, orderBy: { completedAt: "desc" } }),
-    prisma.lead.findMany({ where: { ...scope, status: { notIn: ["CONVERTED", "LOST"] } }, select: { id: true, name: true }, orderBy: { name: "asc" }, take: 300 }),
+    prisma.lead.findMany({ where: { ...scope, status: { notIn: ["CONVERTED", "LOST"] } }, select: { id: true, companyName: true }, orderBy: { companyName: "asc" }, take: 300 }),
     prisma.client.findMany({ where: scope, select: { id: true, name: true }, orderBy: { name: "asc" }, take: 300 }),
     assigneeOptions(user),
   ]);
@@ -20,7 +20,7 @@ export default async function MyTasksPage() {
   const { overdue, today, upcoming } = bucketTasks(rows);
   const related = [
     ...clients.map((c) => ({ value: `client:${c.id}`, label: c.name, group: "Clients" as const })),
-    ...leads.map((l) => ({ value: `lead:${l.id}`, label: l.name, group: "Leads" as const })),
+    ...leads.map((l) => ({ value: `lead:${l.id}`, label: l.companyName, group: "Leads" as const })),
   ];
 
   return (

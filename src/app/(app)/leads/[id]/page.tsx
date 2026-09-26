@@ -7,7 +7,7 @@ import { RecordTasks } from "@/components/record-tasks";
 import { Card, PageBody, PageHeader } from "@/components/layout";
 import { Badge } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS, LEAD_STATUS_TONE } from "@/lib/labels";
+import { LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS, LEAD_STATUS_TONE, SERVICE_LABELS } from "@/lib/labels";
 import { interactionInclude, timelineWhere, toTimelineEntry } from "@/lib/interactions";
 import { prisma } from "@/lib/prisma";
 import { can, ownsRecord } from "@/lib/rbac";
@@ -36,15 +36,21 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   return (
     <>
       <PageHeader
-        title={lead.name}
-        description={`Lead · created ${formatDate(lead.createdAt)}${lead.createdBy ? ` by ${lead.createdBy.name}` : ""}`}
+        title={lead.companyName}
+        description={`Enquiry · ${lead.name}${lead.designation ? `, ${lead.designation}` : ""} · received ${formatDate(lead.createdAt)}${lead.createdBy ? ` · added by ${lead.createdBy.name}` : ""}`}
         actions={
           <LeadActions
             lead={{
               id: lead.id,
+              companyName: lead.companyName,
               name: lead.name,
+              designation: lead.designation,
               phone: lead.phone,
               email: lead.email,
+              city: lead.city,
+              sector: lead.sector,
+              serviceInterest: lead.serviceInterest,
+              revenueCr: lead.revenueCr != null ? Number(lead.revenueCr) : null,
               source: lead.source,
               status: lead.status,
               notes: lead.notes,
@@ -76,13 +82,31 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           <DetailGrid
             items={[
               { label: "Status", value: <Badge tone={LEAD_STATUS_TONE[lead.status]}>{LEAD_STATUS_LABELS[lead.status]}</Badge> },
+              { label: "Contact", value: `${lead.name}${lead.designation ? `, ${lead.designation}` : ""}` },
               { label: "Phone", value: lead.phone },
               { label: "Email", value: lead.email },
+              { label: "Service interested in", value: lead.serviceInterest ? SERVICE_LABELS[lead.serviceInterest] : "Not sure yet" },
+              { label: "Sector · City", value: [lead.sector, lead.city].filter(Boolean).join(" · ") || "—" },
+              { label: "Annual revenue", value: lead.revenueCr != null ? `₹${Number(lead.revenueCr)} Cr` : "—" },
               { label: "Source", value: LEAD_SOURCE_LABELS[lead.source] },
+              ...(lead.readinessScore != null ? [{ label: "IPO-ready check score", value: `${lead.readinessScore} / 100` }] : []),
               { label: "Assigned RM", value: lead.assignedRm?.name ?? "Unassigned" },
               { label: "Last updated", value: formatDateTime(lead.updatedAt) },
             ]}
           />
+          {lead.readinessAnswers && typeof lead.readinessAnswers === "object" && !Array.isArray(lead.readinessAnswers) && (
+            <div className="border-t border-gray-100 px-5 py-4" data-testid="readiness-answers">
+              <p className="text-xs text-gray-500">IPO-ready check answers (from the website)</p>
+              <dl className="mt-1 grid gap-x-6 gap-y-1 text-sm md:grid-cols-2">
+                {Object.entries(lead.readinessAnswers as Record<string, unknown>).map(([q, a]) => (
+                  <div key={q} className="flex justify-between gap-3 border-b border-dashed border-gray-100 py-1">
+                    <dt className="text-gray-600">{q}</dt>
+                    <dd className="text-right font-medium text-gray-900">{String(a)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
           {lead.notes && (
             <div className="border-t border-gray-100 px-5 py-4">
               <p className="text-xs text-gray-500">Notes</p>

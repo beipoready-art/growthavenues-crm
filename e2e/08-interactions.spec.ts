@@ -8,16 +8,16 @@ async function idOf(page: Page, api: "leads" | "clients", q: string) {
 
 test("RM logs interactions on a lead; newest first; filter by type; logged-by auto-filled", async ({ browser }) => {
   const rm = await as(browser, "rm1");
-  const leadId = await idOf(rm, "leads", "Sneha Kulkarni");
+  const leadId = await idOf(rm, "leads", "Kulkarni");
   await rm.goto(`/leads/${leadId}`);
 
   const form = rm.getByTestId("log-interaction");
   await form.getByLabel("Interaction type").selectOption("WHATSAPP");
-  await form.getByLabel("Summary").fill("Sent Kaveri Fintech IPO brochure on WhatsApp.");
+  await form.getByLabel("Summary").fill("Sent SME IPO timeline deck on WhatsApp.");
   await form.getByRole("button", { name: "Log interaction" }).click();
 
   const entries = rm.getByTestId("timeline-entry");
-  await expect(entries.first()).toContainText("Sent Kaveri Fintech IPO brochure");
+  await expect(entries.first()).toContainText("Sent SME IPO timeline deck");
   await expect(entries.first()).toContainText("logged by Rohan Sharma");
   await expect(entries).toHaveCount(3); // 2 seeded + 1 new
 
@@ -38,27 +38,27 @@ test("RM logs interactions on a lead; newest first; filter by type; logged-by au
 
 test("client timeline carries over lead-stage interactions and shows admin edit history", async ({ browser }) => {
   const viewer = await as(browser, "viewer");
-  const clientId = await idOf(viewer, "clients", "Suresh Patel");
+  const clientId = await idOf(viewer, "clients", "Sahyadri");
   await viewer.goto(`/clients/${clientId}`);
   const timeline = viewer.getByTestId("timeline");
-  await expect(timeline.getByText("Referral from existing client")).toBeVisible();
+  await expect(timeline.getByText("Referral from a CA partner")).toBeVisible();
   await expect(timeline.getByText("lead stage")).toBeVisible();
-  await expect(timeline.getByText("Risk profile: moderate")).toBeVisible();
+  await expect(timeline.getByText("Price band finalised at ₹142–150")).toBeVisible();
   await timeline.getByText(/Edited by Aarti Mehta/).click();
-  await expect(timeline.getByText("Risk profile: aggressive")).toBeVisible();
-  await expect(timeline.getByText(/corrected per signed form/)).toBeVisible();
+  await expect(timeline.getByText("Price band finalised at ₹140–148")).toBeVisible();
+  await expect(timeline.getByText(/corrected to the final band/)).toBeVisible();
   await expect(viewer.getByTestId("log-interaction")).toHaveCount(0); // viewer is read-only
 });
 
 test("admin edit and remove require a reason; removed entries stay visible", async ({ browser }) => {
   const admin = await as(browser, "admin");
-  const clientId = await idOf(admin, "clients", "Arjun Kapoor");
+  const clientId = await idOf(admin, "clients", "Kaveri Agro");
   await admin.goto(`/clients/${clientId}`);
-  const entry = admin.getByTestId("timeline-entry").filter({ hasText: "Nilgiri refund timeline" });
+  const entry = admin.getByTestId("timeline-entry").filter({ hasText: "Shared DRHP chapter drafts" });
 
   // Edit
   await entry.getByRole("button", { name: "Edit" }).click();
-  await admin.fill("#am-summary", "Explained Nilgiri refund timeline; funds unblocked on T+4.");
+  await admin.fill("#am-summary", "Shared DRHP chapter drafts (business, risk factors, T+4 feedback) for CFO review.");
   await admin.fill("#am-reason", "Added refund date");
   await admin.getByRole("button", { name: "Save edit" }).click();
   await expect(admin.getByTestId("timeline-entry").filter({ hasText: "T+4" })).toContainText("Edited by Aarti Mehta");
@@ -86,7 +86,7 @@ test("admin edit and remove require a reason; removed entries stay visible", asy
 
 test("leads with interactions cannot be deleted", async ({ browser }) => {
   const admin = await as(browser, "admin");
-  const leadId = await idOf(admin, "leads", "Rajesh Iyer");
+  const leadId = await idOf(admin, "leads", "Iyer Precision");
   const res = await admin.request.delete(`/api/leads/${leadId}`);
   expect(res.status()).toBe(400);
   expect((await res.json()).error).toMatch(/permanent record/);

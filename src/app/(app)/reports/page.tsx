@@ -30,8 +30,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const best = [...sources].filter((s) => s.leads > 0).sort((a, b) => b.conversionRate - a.conversionRate)[0];
 
   const exports = [
-    { href: "/api/reports/clients", title: "Client list with KYC status", desc: "All clients, PAN, type, KYC status and last KYC change." },
-    { href: "/api/reports/ipo-summary", title: "IPO subscription summary", desc: "Per IPO: clients applied, lots, total amount, status breakdown." },
+    { href: "/api/reports/clients", title: "Client companies with KYC status", desc: "Companies, CIN/PAN, sector, financials, onboarding KYC status, RM." },
+    { href: "/api/reports/mandates", title: "Mandate pipeline", desc: "Every mandate: client, service, board, stage, issue size, fees, dates." },
     ...(canPerf ? [{ href: `/api/reports/rm-performance?${q}`, title: "RM performance", desc: `Per-RM metrics · ${range.label}.` }] : []),
     { href: `/api/reports/lead-sources?${q}`, title: "Lead source effectiveness", desc: `Conversion by source · ${range.label}.` },
   ];
@@ -107,15 +107,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
         <h2 className="pt-2 text-sm font-semibold text-gray-900">Pipeline over time · last 6 months</h2>
         <div className="grid gap-5 lg:grid-cols-2">
-          <Card title="Pipeline value (IPO application value by month)">
+          <Card title="Pipeline value (fees of mandates signed, by month)">
             <div className="px-4 py-3">
-              <VBarChart
-                data={pipeline}
-                dataKey="applicationValue"
-                label="Application value"
-                valueFormat="inr"
-                ariaLabel="IPO application value by month"
-              />
+              <VBarChart data={pipeline} dataKey="feeSigned" label="Expected fee signed" valueFormat="inr" ariaLabel="Fees of mandates signed by month" />
             </div>
           </Card>
           <Card title="Lead pipeline (new leads vs conversions)">
@@ -138,8 +132,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                 <Th>Month</Th>
                 <Th className="text-right">New leads</Th>
                 <Th className="text-right">Conversions</Th>
-                <Th className="text-right">IPO applications</Th>
-                <Th className="text-right">Application value</Th>
+                <Th className="text-right">Mandates signed</Th>
+                <Th className="text-right">Fees signed</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100" data-testid="pipeline-table">
@@ -148,8 +142,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                   <Td>{m.label}</Td>
                   <Td className="text-right tabular-nums">{m.newLeads}</Td>
                   <Td className="text-right tabular-nums">{m.conversions}</Td>
-                  <Td className="text-right tabular-nums">{m.applications}</Td>
-                  <Td className="text-right tabular-nums">{formatINR(m.applicationValue)}</Td>
+                  <Td className="text-right tabular-nums">{m.mandatesSigned}</Td>
+                  <Td className="text-right tabular-nums">{formatINR(m.feeSigned)}</Td>
                 </tr>
               ))}
             </tbody>

@@ -22,13 +22,26 @@ export type DocRow = {
   notes: string | null;
   createdAt: string;
   uploadedBy: string | null;
+  mandate: { id: string; code: string } | null;
 };
 
-const KYC = new Set<DocumentCategory>(["KYC_PAN", "KYC_AADHAAR", "KYC_BANK_PROOF", "KYC_PHOTO"]);
-const GENERAL: DocumentCategory[] = ["CONTRACT_NOTE", "RISK_DISCLOSURE", "APPLICATION_FORM", "OTHER"];
+type MandateOption = { id: string; code: string; title: string };
+
+const isKyc = (c: DocumentCategory) => c.startsWith("KYC_");
+const GENERAL: DocumentCategory[] = ["ENGAGEMENT_LETTER", "PROPOSAL", "NDA", "FINANCIALS", "ITR", "DUE_DILIGENCE", "VALUATION_REPORT", "PITCH_DECK", "DRHP", "RHP", "OTHER"];
 
 /** All documents for a client: latest version per document, with expandable version history. */
-export function DocumentsPanel({ clientId, documents, canUpload }: { clientId: string; documents: DocRow[]; canUpload: boolean }) {
+export function DocumentsPanel({
+  clientId,
+  documents,
+  canUpload,
+  mandates = [],
+}: {
+  clientId: string;
+  documents: DocRow[];
+  canUpload: boolean;
+  mandates?: MandateOption[];
+}) {
   const [category, setCategory] = useState<string>("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState<{ replaces?: DocRow } | null>(null);
@@ -72,7 +85,7 @@ export function DocumentsPanel({ clientId, documents, canUpload }: { clientId: s
       }
     >
       {groups.length === 0 ? (
-        <EmptyState title="No documents" description={category ? "Nothing in this category yet." : "Upload contract notes, risk disclosures, application forms and more."} />
+        <EmptyState title="No documents" description={category ? "Nothing in this category yet." : "Upload engagement letters, financials, DRHP drafts and more."} />
       ) : (
         <Table>
           <thead>
@@ -105,12 +118,13 @@ export function DocumentsPanel({ clientId, documents, canUpload }: { clientId: s
                           <p className="truncate font-medium text-gray-900">{d.title ?? d.fileName}</p>
                           <p className="truncate text-xs text-gray-500">
                             {d.fileName} · {formatBytes(d.sizeBytes)}
+                            {d.mandate && <> · {d.mandate.code}</>}
                           </p>
                         </div>
                       </div>
                     </Td>
                     <Td>
-                      <Badge tone={KYC.has(d.category) ? "violet" : "gray"}>{DOCUMENT_CATEGORY_LABELS[d.category]}</Badge>
+                      <Badge tone={isKyc(d.category) ? "violet" : "gray"}>{DOCUMENT_CATEGORY_LABELS[d.category]}</Badge>
                     </Td>
                     <Td>
                       v{d.version}
@@ -121,7 +135,7 @@ export function DocumentsPanel({ clientId, documents, canUpload }: { clientId: s
                     <Td className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <DocLinks id={d.id} />
-                        {canUpload && !KYC.has(d.category) && (
+                        {canUpload && !isKyc(d.category) && (
                           <Button size="sm" variant="ghost" onClick={() => setUploading({ replaces: d })}>
                             New version
                           </Button>
@@ -150,7 +164,7 @@ export function DocumentsPanel({ clientId, documents, canUpload }: { clientId: s
           </tbody>
         </Table>
       )}
-      {uploading && <UploadModal clientId={clientId} replaces={uploading.replaces} onClose={() => setUploading(null)} />}
+      {uploading && <UploadModal clientId={clientId} replaces={uploading.replaces} mandates={mandates} onClose={() => setUploading(null)} />}
     </Card>
   );
 }
@@ -168,7 +182,7 @@ function DocLinks({ id }: { id: string }) {
   );
 }
 
-function UploadModal({ clientId, replaces, onClose }: { clientId: string; replaces?: DocRow; onClose: () => void }) {
+function UploadModal({ clientId, replaces, mandates, onClose }: { clientId: string; replaces?: DocRow; mandates: MandateOption[]; onClose: () => void }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -181,6 +195,7 @@ function UploadModal({ clientId, replaces, onClose }: { clientId: string; replac
     if (replaces) {
       form.set("replacesGroupId", replaces.groupId);
       form.set("category", replaces.category);
+      if (replaces.mandate) form.set("mandateId", replaces.mandate.id);
     }
     try {
       await api(`/api/clients/${clientId}/documents`, "POST", form);
@@ -197,7 +212,7 @@ function UploadModal({ clientId, replaces, onClose }: { clientId: string; replac
       open
       onClose={onClose}
       title={replaces ? `New version of "${replaces.title ?? replaces.fileName}"` : "Upload document"}
-      description={replaces ? `The current version (v${replaces.version}) stays available in the history.` : "PDF, JPG, PNG or WEBP up to 10 MB. KYC documents are uploaded in the KYC section."}
+      description={replaces ? `The current version (v${replaces.version}) stays available in the history.` : "PDF, Word, Excel, PowerPoint or images, up to 25 MB. Onboarding KYC documents are uploaded in the KYC section."}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -213,7 +228,12 @@ function UploadModal({ clientId, replaces, onClose }: { clientId: string; replac
         <ErrorText>{error}</ErrorText>
         {!replaces && (
           <Field label="Category" htmlFor="du-category">
-            <Select id="du-category" name="category" options={GENERAL.map((c) => ({ value: c, label: DOCUMENT_CATEGORY_LABELS[c] }))} defaultValue="CONTRACT_NOTE" />
+            <Select id="du-category" name="category" options={GENERAL.map((c) => ({ value: c, label: DOCUMENT_CATEGORY_LABELS[c] }))} defaultValue="ENGAGEMENT_LETTER" />
+          </Field>
+        )}
+        {!replaces && mandates.length > 0 && (
+          <Field label="Mandate" htmlFor="du-mandate" hint="Optional: file it under an engagement.">
+            <Select id="du-mandate" name="mandateId" options={mandates.map((m) => ({ value: m.id, label: `${m.code} · ${m.title}` }))} placeholder="Not linked" />
           </Field>
         )}
         {!replaces && (
@@ -222,7 +242,7 @@ function UploadModal({ clientId, replaces, onClose }: { clientId: string; replac
           </Field>
         )}
         <Field label="File" htmlFor="du-file">
-          <Input id="du-file" name="file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" required className="py-1.5" />
+          <Input id="du-file" name="file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,.docx,.xlsx,.pptx" required className="py-1.5" />
         </Field>
         <Field label="Notes" htmlFor="du-notes">
           <Textarea id="du-notes" name="notes" rows={2} />

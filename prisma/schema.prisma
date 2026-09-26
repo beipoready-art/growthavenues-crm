@@ -1,9 +1,13 @@
-// GrowthAvenues CRM — Prisma schema
+// Be IPO Ready CRM — Prisma schema
 //
-// Design notes (for Phase 2+):
-// - Client is the hub entity. Future modules (IPO applications, interaction
-//   logs, orders) should add their own models with a `clientId` FK rather than
-//   adding columns to Client.
+// Domain: Be IPO Ready advises companies on fund raising, pre-IPO, SME /
+// mainboard IPOs and valuation. A Lead is a company enquiry; a Client is a
+// company we've onboarded; a Mandate is one engagement (e.g. an SME IPO)
+// moving through a stage pipeline.
+//
+// Design notes:
+// - Client is the hub entity. New modules add their own models with a
+//   `clientId` FK rather than adding columns to Client.
 // - Document is generic: KYC uploads are just documents with a KYC_* category.
 //   A general document vault only needs new DocumentCategory values.
 // - AuditLog is a generic, append-only activity trail keyed by entityType +
@@ -30,8 +34,11 @@ enum Role {
 }
 
 enum LeadSource {
-  REFERRAL
   WEBSITE
+  READINESS_CALL // "Book an IPO Readiness Call" on the website
+  READINESS_CHECK // "Are you IPO ready? 2-minute check" on the website
+  REFERRAL
+  EVENT
   CALL_IN
   OTHER
 }
@@ -39,15 +46,58 @@ enum LeadSource {
 enum LeadStatus {
   NEW
   CONTACTED
+  DISCOVERY // discovery call held
   QUALIFIED
   CONVERTED
   LOST
 }
 
-enum ClientType {
-  INDIVIDUAL
-  HUF
-  CORPORATE
+// Services offered (beipoready.com → Services).
+enum ServiceLine {
+  FUND_RAISING
+  PRE_IPO
+  SME_IPO
+  MAINBOARD_IPO
+  VALUATION_RESTRUCTURING
+}
+
+enum EntityType {
+  PRIVATE_LIMITED
+  PUBLIC_LIMITED
+  LLP
+  PARTNERSHIP
+  PROPRIETORSHIP
+  OTHER
+}
+
+enum ListingBoard {
+  NSE_EMERGE
+  BSE_SME
+  MAINBOARD
+  NOT_APPLICABLE // private placement, valuation, etc.
+}
+
+// Union of all stages; each service uses its own ordered subset (src/lib/mandates.ts).
+enum MandateStage {
+  PROPOSAL
+  MANDATE_SIGNED
+  DUE_DILIGENCE
+  RESTRUCTURING
+  DRHP_DRAFTING
+  DRHP_FILED
+  OBSERVATIONS
+  APPROVAL
+  RHP_FILED
+  ROADSHOW
+  ISSUE_OPEN
+  LISTED
+  INVESTOR_OUTREACH
+  TERM_SHEET
+  DOCUMENTATION
+  DRAFT_REPORT
+  COMPLETED
+  ON_HOLD
+  DROPPED
 }
 
 enum KycStatus {
@@ -59,13 +109,24 @@ enum KycStatus {
 }
 
 enum DocumentCategory {
-  KYC_PAN
-  KYC_AADHAAR
-  KYC_BANK_PROOF
-  KYC_PHOTO
-  CONTRACT_NOTE
-  RISK_DISCLOSURE
-  APPLICATION_FORM
+  // Company onboarding KYC
+  KYC_COI // certificate of incorporation
+  KYC_PAN // company PAN
+  KYC_GST
+  KYC_MOA_AOA
+  KYC_BOARD_RESOLUTION
+  KYC_PROMOTER_KYC
+  // Engagement & transaction documents
+  NDA
+  PROPOSAL
+  ENGAGEMENT_LETTER
+  FINANCIALS
+  ITR
+  DUE_DILIGENCE
+  VALUATION_REPORT
+  PITCH_DECK
+  DRHP
+  RHP
   OTHER
 }
 
@@ -74,14 +135,6 @@ enum IpoStatus {
   OPEN
   CLOSED
   LISTED
-}
-
-enum IpoApplicationStatus {
-  APPLIED
-  ALLOTTED
-  PARTIALLY_ALLOTTED
-  REJECTED
-  REFUNDED
 }
 
 enum InteractionType {
@@ -109,7 +162,8 @@ enum NotificationType {
   CLIENT_ASSIGNED
   TASK_ASSIGNED
   TASK_DUE
-  IPO_CLOSING
+  MANDATE_STAGE
+  MANDATE_DUE
 }
 
 // ─── Users & auth ─────────────────────────────────────────────────────────
@@ -133,7 +187,9 @@ model User {
   kycStatusChanges     KycStatusChange[]
   auditLogs            AuditLog[]
   createdIpos          Ipo[]
-  ipoApplications      IpoApplication[]
+  mandatesLed          Mandate[]             @relation("MandateLeadAdvisor")
+  mandatesCreated      Mandate[]             @relation("MandateCreatedBy")
+  mandateStageChanges  MandateStageChange[]
   interactionsLogged   Interaction[]         @relation("InteractionLoggedBy")
   interactionsEdited   Interaction[]         @relation("InteractionEditedBy")
   interactionsDeleted  Interaction[]         @relation("InteractionDeletedBy")
@@ -141,33 +197,43 @@ model User {
   tasksAssigned        Task[]                @relation("TaskAssignee")
   tasksCreated         Task[]                @relation("TaskCreator")
   notifications        Notification[]
-  ipoInterests         IpoInterest[]
 
   @@index([role])
 }
 
 // ─── Leads & clients ──────────────────────────────────────────────────────
 
+// A company enquiry. `name` is the contact person; `companyName` the business.
 model Lead {
-  id           String     @id @default(cuid())
-  name         String
-  phone        String
-  email        String?
-  source       LeadSource @default(OTHER)
-  status       LeadStatus @default(NEW)
-  notes        String?
-  assignedRmId String?
-  assignedRm   User?      @relation("LeadAssignedRm", fields: [assignedRmId], references: [id], onDelete: SetNull)
-  createdById  String?
-  createdBy    User?      @relation("LeadCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  convertedAt  DateTime?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id               String       @id @default(cuid())
+  companyName      String
+  name             String
+  designation      String?
+  phone            String
+  email            String?
+  city             String?
+  sector           String?
+  serviceInterest  ServiceLine?
+  revenueCr        Decimal?     @db.Decimal(14, 2) // latest annual revenue, ₹ crore
+  // Website "2-minute IPO-ready check": score 0–100 and the raw answers.
+  readinessScore   Int?
+  readinessAnswers Json?
+  source           LeadSource   @default(OTHER)
+  status           LeadStatus   @default(NEW)
+  notes            String?
+  assignedRmId     String?
+  assignedRm       User?        @relation("LeadAssignedRm", fields: [assignedRmId], references: [id], onDelete: SetNull)
+  createdById      String?
+  createdBy        User?        @relation("LeadCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  convertedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   // Set once the lead is converted. The lead row is kept for history.
   client       Client?
   interactions Interaction[]
   tasks        Task[]
+  contacts     Contact[]
 
   @@index([status])
   @@index([assignedRmId])
@@ -175,33 +241,67 @@ model Lead {
   @@index([createdAt])
 }
 
+// A company we advise.
 model Client {
-  id           String     @id @default(cuid())
-  name         String
-  phone        String
-  email        String?
-  source       LeadSource @default(OTHER)
-  panNumber    String?    @unique
-  clientType   ClientType @default(INDIVIDUAL)
-  kycStatus    KycStatus  @default(PENDING)
-  notes        String?
-  assignedRmId String?
-  assignedRm   User?      @relation("ClientAssignedRm", fields: [assignedRmId], references: [id], onDelete: SetNull)
-  leadId       String?    @unique
-  lead         Lead?      @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id                String     @id @default(cuid())
+  name              String // registered company name
+  cin               String?    @unique
+  panNumber         String?    @unique // company PAN
+  gstin             String?
+  entityType        EntityType @default(PRIVATE_LIMITED)
+  sector            String?
+  incorporationYear Int?
+  city              String?
+  state             String?
+  website           String?
+  phone             String?
+  email             String?
+  source            LeadSource @default(OTHER)
+  // Latest audited financials (₹ crore) — used for SME / mainboard screening.
+  financialYear     String? // e.g. "FY2025-26"
+  revenueCr         Decimal?   @db.Decimal(14, 2)
+  ebitdaCr          Decimal?   @db.Decimal(14, 2)
+  patCr             Decimal?   @db.Decimal(14, 2)
+  netWorthCr        Decimal?   @db.Decimal(14, 2)
+  kycStatus         KycStatus  @default(PENDING)
+  notes             String?
+  assignedRmId      String?
+  assignedRm        User?      @relation("ClientAssignedRm", fields: [assignedRmId], references: [id], onDelete: SetNull)
+  leadId            String?    @unique
+  lead              Lead?      @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
   documents        Document[]
   kycStatusChanges KycStatusChange[]
-  ipoApplications  IpoApplication[]
   interactions     Interaction[]
   tasks            Task[]
-  ipoInterests     IpoInterest[]
+  contacts         Contact[]
+  mandates         Mandate[]
 
   @@index([kycStatus])
   @@index([assignedRmId])
   @@index([createdAt])
+}
+
+// People at a lead or client company (promoter, CFO, company secretary…).
+model Contact {
+  id          String   @id @default(cuid())
+  clientId    String?
+  client      Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  leadId      String?
+  lead        Lead?    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  name        String
+  designation String?
+  email       String?
+  phone       String?
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([leadId])
+  @@index([email])
 }
 
 // ─── Documents & KYC ──────────────────────────────────────────────────────
@@ -210,6 +310,8 @@ model Document {
   id           String           @id @default(cuid())
   clientId     String
   client       Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  mandateId    String?
+  mandate      Mandate?         @relation(fields: [mandateId], references: [id], onDelete: SetNull)
   category     DocumentCategory
   title        String? // display name; falls back to fileName
   fileName     String // original filename as uploaded
@@ -262,7 +364,9 @@ model AuditLog {
   @@index([entityType, entityId, createdAt])
 }
 
-// ─── IPOs (Phase 2) ───────────────────────────────────────────────────────
+// ─── IPO issues ───────────────────────────────────────────────────────────
+// Issue details (price band, lot size, dates). Linked to the mandate when it
+// is one of our own issues; unlinked rows serve as a market tracker.
 
 model Ipo {
   id            String    @id @default(cuid())
@@ -282,34 +386,10 @@ model Ipo {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  applications IpoApplication[]
-  interests    IpoInterest[]
+  mandate Mandate?
 
   @@index([status])
   @@index([openDate])
-}
-
-model IpoApplication {
-  id              String               @id @default(cuid())
-  ipoId           String
-  ipo             Ipo                  @relation(fields: [ipoId], references: [id], onDelete: Restrict)
-  clientId        String
-  client          Client               @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  lotsApplied     Int
-  amount          Decimal              @db.Decimal(14, 2)
-  applicationDate DateTime             @db.Date
-  status          IpoApplicationStatus @default(APPLIED)
-  lotsAllotted    Int?
-  notes           String?
-  createdById     String?
-  createdBy       User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-
-  // One application per client (PAN) per IPO.
-  @@unique([ipoId, clientId])
-  @@index([clientId])
-  @@index([status])
 }
 
 // ─── Interaction log (Phase 2) ────────────────────────────────────────────
@@ -385,22 +465,6 @@ model Task {
   @@index([clientId])
 }
 
-// Client has shown interest in an IPO (drives "IPO closing soon" alerts
-// until they apply).
-model IpoInterest {
-  id          String   @id @default(cuid())
-  ipoId       String
-  ipo         Ipo      @relation(fields: [ipoId], references: [id], onDelete: Cascade)
-  clientId    String
-  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  note        String?
-  createdById String?
-  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-
-  @@unique([ipoId, clientId])
-}
-
 // ─── Notifications (Phase 3) ──────────────────────────────────────────────
 
 model Notification {
@@ -425,7 +489,7 @@ model Notification {
 // Singleton row (id = 1): firm profile shown across the CRM.
 model CompanyProfile {
   id               Int      @id @default(1)
-  firmName         String   @default("GrowthAvenues")
+  firmName         String   @default("Be IPO Ready")
   tagline          String?
   email            String?
   phone            String?
@@ -436,4 +500,55 @@ model CompanyProfile {
   logoMime         String?
   updatedAt        DateTime @updatedAt
   updatedById      String?
+}
+
+// ─── Mandates (engagement pipeline) ───────────────────────────────────────
+
+model Mandate {
+  id             String       @id @default(cuid())
+  code           String       @unique // e.g. BIR-2026-007
+  title          String
+  clientId       String
+  client         Client       @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  service        ServiceLine
+  board          ListingBoard @default(NOT_APPLICABLE)
+  stage          MandateStage @default(PROPOSAL)
+  stageChangedAt DateTime     @default(now())
+  issueSizeCr    Decimal?     @db.Decimal(14, 2) // target raise / issue size, ₹ crore
+  retainerFee    Decimal?     @db.Decimal(14, 2) // ₹
+  successFeePct  Decimal?     @db.Decimal(5, 2) // % of amount raised
+  expectedFee    Decimal?     @db.Decimal(14, 2) // ₹, retainer + success fee estimate
+  targetDate     DateTime?    @db.Date // expected listing / closing
+  signedAt       DateTime? // mandate signed
+  closedAt       DateTime? // listed / completed / dropped
+  notes          String?
+  leadAdvisorId  String?
+  leadAdvisor    User?        @relation("MandateLeadAdvisor", fields: [leadAdvisorId], references: [id], onDelete: SetNull)
+  ipoId          String?      @unique
+  ipo            Ipo?         @relation(fields: [ipoId], references: [id], onDelete: SetNull)
+  createdById    String?
+  createdBy      User?        @relation("MandateCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  stageChanges MandateStageChange[]
+  documents    Document[]
+
+  @@index([stage])
+  @@index([clientId])
+  @@index([leadAdvisorId])
+}
+
+model MandateStageChange {
+  id          String        @id @default(cuid())
+  mandateId   String
+  mandate     Mandate       @relation(fields: [mandateId], references: [id], onDelete: Cascade)
+  fromStage   MandateStage?
+  toStage     MandateStage
+  note        String?
+  changedById String?
+  changedBy   User?         @relation(fields: [changedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime      @default(now())
+
+  @@index([mandateId, createdAt])
 }
